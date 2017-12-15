@@ -62,11 +62,42 @@ def configureDB(connectWindow):
 		
 		if reply == QtWidgets.QMessageBox.Ok:
 			#series of steps
-			if globalvars.engine == "Microsoft SQL Server":
-				#create db
+			try:
+				if globalvars.engine == "Microsoft SQL Server":
+					#create db
+					conn = pyodbc.connect(globalvars.connTest, autocommit=True)
+					cursor = conn.cursor()
+					cursor.execute("CREATE DATABASE " + globalvars.DBGIT)
+
+					eventLogger = open("./scripts/MSSQL/01 DDLEvents.sql", "r")
+					sql01 = eventLogger.read()
+					eventLogger.close()
+
+					cursor.execute(sql01)
+
+					eventLogger = open("./scripts/MSSQL/02 SQLVCEventLogger.sql", "r")
+					sql02 = eventLogger.read()
+					eventLogger.close()
+
+					cursor.execute(sql02)
+					conn.close()
+			except Exception as e:
+				saveLog(e)
+				print("Error creating repository! Please see log file")
+				error_message = "Error creating repository! Please see log file"
+				reply = QtWidgets.QMessageBox.question(connectWindow, "Install Scripts", error_message,  QtWidgets.QMessageBox.Ok)
+
+
 				conn = pyodbc.connect(globalvars.connTest, autocommit=True)
 				cursor = conn.cursor()
-				cursor.execute("CREATE DATABASE " + globalvars.DBGIT)
+				cursor.execute("DROP DATABASE " + globalvars.DBGIT)
+
+				eventLogger = open("./scripts/MSSQL/rollback.sql", "r")
+				rollback = eventLogger.read()
+				eventLogger.close()
+
+				cursor.execute(rollback)
+				
 				conn.close()
 		else:
 			return False
@@ -102,7 +133,7 @@ def testConn(serverType, server, authType, username = None, password = None):
 			return False
 
 def saveLog(message):
-	log_dir = "./logs/"
+	log_dir = os.path.expanduser("~") + "/sqlvc/logs/"
 	pTime = time.strftime("%m-%d-%Y_%H%M%p")
 
 	if not os.path.isdir(log_dir):
