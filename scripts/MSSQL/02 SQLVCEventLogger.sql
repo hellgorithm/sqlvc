@@ -4,7 +4,7 @@ CREATE TRIGGER [SQLGitEventLogger]
     FOR DDL_DATABASE_LEVEL_EVENTS
 AS
 BEGIN
-    SET NOCOUNT ON;
+   SET NOCOUNT ON;
     DECLARE
         @EventData XML = EVENTDATA();
  
@@ -23,6 +23,7 @@ BEGIN
         DatabaseName,
         SchemaName,
         ObjectName,
+		ObjectType,
         HostName,
         IPAddress,
         ProgramName,
@@ -34,6 +35,7 @@ BEGIN
         @EventData.value('(/EVENT_INSTANCE/DatabaseName)[1]',  'NVARCHAR(255)'),--DB_NAME(),
         @EventData.value('(/EVENT_INSTANCE/SchemaName)[1]',  'NVARCHAR(255)'), 
         @EventData.value('(/EVENT_INSTANCE/ObjectName)[1]',  'NVARCHAR(255)'),
+        @EventData.value('(/EVENT_INSTANCE/ObjectType)[1]',  'NVARCHAR(255)'),
         HOST_NAME(),
         @ip,
         PROGRAM_NAME(),
