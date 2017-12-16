@@ -11,7 +11,6 @@ def EventEmmitter(index):
 	# print('' + str(strData))
 
     item = index.selectedIndexes()[0]
-    print(item.data(0))
 
 def OpenConnection(connectWindow):
 	#save connection for later use
@@ -156,13 +155,32 @@ def saveConfigurations(path, connWin = None):
 
 		root = ET.Element("config")
 
-	doc = ET.SubElement(root, "instances")
+	doc = root.find('instances')
+	
+	if doc == None:
+		doc = ET.SubElement(root, "instances")
 
 	if connWin is not None:
-		ET.SubElement(doc, "instance").text = str(connWin.cmbServers.currentText())
-	# for x in range(self.pathList.count()):
-	# 	checked = self.pathList.item(x).checkState()
-	# 	ET.SubElement(doc, "path", status=str(checked), name=str('path')).text = str(self.pathList.item(x).text())
+		if str(connWin.cmbServers.currentText()) not in [elem.attrib["instance"] for elem in root.findall('instances/instance')]:
+			ET.SubElement(doc, "instance", 
+				instance=str(connWin.cmbServers.currentText()),
+				authentication = str(connWin.cmbAuthType.currentText()),
+				user = str(connWin.txtUserName.text()),
+				password='').text = str(connWin.cmbServers.currentText())
 
 	tree = ET.ElementTree(root)
 	tree.write(path)
+
+def readConnConfiguration(path, connWin = None):
+	if os.path.exists(path):
+		root = ET.parse(path).getroot()
+		instances = root.findall('instances/instance')
+
+		for instance in instances:
+			connWin.layout.cmbServers.addItem(instance.attrib["instance"])
+			index = connWin.layout.cmbAuthType.findText(instance.attrib["authentication"], QtCore.Qt.MatchFixedString)
+			if index >= 0:
+				connWin.layout.cmbAuthType.setCurrentIndex(index)
+			connWin.layout.txtUserName.setText(instance.attrib["user"])
+
+

@@ -144,15 +144,19 @@ class MainWindow(QtWidgets.QMainWindow):
 		bar = self.menuBar()
 
 		# File menu
-		file_menu = bar.addMenu('File')
+		file_menu = bar.addMenu('&File')
+		help_menu = bar.addMenu('&Help')
 
 		#Open connection
-		open_action = QtWidgets.QAction('Open Connection', self)
+		open_action = QtWidgets.QAction('&Open Connection', self)
 		file_menu.addAction(open_action)
 		file_menu.triggered.connect(self.addConnection)
 
 		close_action = QtWidgets.QAction('&Quit', self)
 		file_menu.addAction(close_action)
+
+		about_action = QtWidgets.QAction('&About', self)
+		help_menu.addAction(about_action)
 
 		# # Edit menu
 		# edit_menu = bar.addMenu('Edit')
@@ -167,7 +171,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 	def addConnection(self):
+		home = expanduser("~")
+		homeConfigPath = home + "/sqlvc/sqlvc-config.xml"
+		readConnConfiguration(homeConfigPath, conn)
 		conn.show()
+
 
 	def center(self):
 		frameGm = self.frameGeometry()
