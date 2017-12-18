@@ -7,6 +7,12 @@ import time
 from treeModel import treeModel
 import tempfile
 import subprocess, threading
+import hashlib
+from Crypto.Cipher import AES
+from Crypto.Hash import SHA256
+import base64
+import uuid
+
 
 def EventEmmitter(index):
 	# item = trViewObjects.model().index(0,0)
@@ -41,6 +47,7 @@ def OpenConnection(connectWindow):
 		#if no errors exeecuting config...continue
 		if continueExec:
 			getUserObject()
+			getChangesets()
 
 		connectWindow.btnCancel.click()
 	else:
@@ -50,7 +57,6 @@ def OpenConnection(connectWindow):
 def configureDB(connectWindow):
 
 	connString = ""
-	db = dbConn()
 
 	try:
 		if globalvars.engine == "Microsoft SQL Server":
@@ -205,12 +211,25 @@ def saveConfigurations(path, connWin = None):
 		doc = ET.SubElement(root, "instances")
 
 	if connWin is not None:
+		#password handler
+		#encoded = EncodeDecodePassword(connWin.txtPassword.text(), globalvars.masterPassword, 1)
+
 		if str(connWin.cmbServers.currentText()) not in [elem.attrib["instance"] for elem in root.findall('instances/instance')]:
 			ET.SubElement(doc, "instance", 
 				instance=str(connWin.cmbServers.currentText()),
 				authentication = str(connWin.cmbAuthType.currentText()),
 				user = str(connWin.txtUserName.text()),
-				password='').text = str(connWin.cmbServers.currentText())
+				password=encoded).text = str(connWin.cmbServers.currentText())
+
+		for instance in root.findall("instances/instance"):
+			if instance.attrib["instance"] == str(connWin.cmbServers.currentText()):
+				instance.set("selected", "1")
+				instance.set("authentication", str(connWin.cmbAuthType.currentText()))
+				instance.set("user", str(connWin.txtUserName.text()))
+				instance.set("password", "")
+			else:
+				instance.set("selected", "0")
+			#print(instance.attrib["instance"])
 
 	tree = ET.ElementTree(root)
 	tree.write(path)
@@ -219,13 +238,19 @@ def readConnConfiguration(path, connWin = None):
 	if os.path.exists(path):
 		root = ET.parse(path).getroot()
 		instances = root.findall('instances/instance')
-		print(len(instances))
+		
+		cmbIndex = 0
+
 		for instance in reversed(instances):
 			connWin.layout.cmbServers.addItem(instance.attrib["instance"])
-			index = connWin.layout.cmbAuthType.findText(instance.attrib["authentication"], QtCore.Qt.MatchFixedString)
-			if index >= 0:
-				connWin.layout.cmbAuthType.setCurrentIndex(index)
-			connWin.layout.txtUserName.setText(instance.attrib["user"])
+
+			if instance.attrib["selected"] == "1":
+				connWin.layout.cmbServers.setCurrentIndex(cmbIndex)
+				connWin.layout.cmbAuthType.setCurrentIndex(cmbIndex)
+				connWin.layout.txtUserName.setText(instance.attrib["user"])
+				connWin.layout.txtPassword.setText("")
+
+			cmbIndex = cmbIndex + 1
 
 def getUserObject():
 
@@ -242,9 +267,35 @@ def getUserObject():
 
 	generateView()
 
+# def EncodeDecodePassword(password, master, mode):
+# 	passKey = ""
+# 	masterHash = SHA256.new(master).hexdigest()[0:32]
+	
+# 	if mode == 1:
+# 		cipher = AES.new(masterHash,AES.MODE_ECB)
+# 		passKey = base64.b64encode(cipher.encrypt(password))
+	
+# 	if mode == 0:
+# 		decoded = cipher.decrypt(base64.b64decode(encoded))
+# 		passKey = decoded.strip()
+# 	print(passKey)
+# 	return passKey
+
 def generateView():
+	#clearQTreeWidget(globalvars.objListTab) #clean objet list
+	globalvars.objListTab.clear()
 	trViewObjects = treeModel()
 	trViewObjects.generateView(globalvars.objListTab, globalvars.databaseEdits)
+
+# def clearQTreeWidget(tree):
+# 	# root = tree.invisibleRootItem()
+# 	# for item in tree.selectedItems():
+# 	# 	(item.parent() or root).removeChild(item)
+# 	item = tree.invisibleRootItem()
+# 	for i in range(item.childCount()):
+# 		child = item.child(i)
+# 		if child.parent() != None:
+# 			child.parent().removeChild(child)
 
 def generateObjectScript(user, database, objType, objName, rowId = None):
 
@@ -283,12 +334,13 @@ def generateVersionList(database, objType, objName):
 
 def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, compareType):
 	compare_directory = str(tempfile.gettempdir()) + "/"
-	print(compare_directory)
 	obj1 = ""
 	obj2 = ""
 	name1 = ""
 	name2 = ""
 	targetDB = ""
+	hash_md5 = hashlib.md5()
+	hexdigest = ""
 
 	if globalvars.engine == "Microsoft SQL Server":
 		if compareType == "compareLatest": #compare your edits to currently applied
@@ -296,6 +348,8 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 			name2 = compare_directory + objName2 + "_LATEST_USERVERSION.sql"
 			obj1 = generateObjectScript('', db1, objType1, objName1) #latest version of the script
 			obj2 = generateObjectScript(user, db2, objType2, objName2) #latest version of the user
+			hash_md5.update(obj2)
+			hexdigest = hash_md5.hexdigest()
 			targetDB = db2
 
 	c1 = open(name1, "w")
@@ -314,13 +368,26 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 		rc = p.returncode
 		
 		if rc == 0:
-			apply_message = "Apply merged files? You cannot push your code unless you owned the lates version."
-			reply  = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", apply_message,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
+			new_hash_md5 = hashlib.md5()
+			merged = open(name2, "r")
+			toApply = merged.read()
+			new_hash_md5.update(toApply)
 
-			if reply == QtWidgets.QMessageBox.Ok:
-				merged = open(name2, "r")
-				toApply = merged.read()
-				checkForApply(toApply,targetDB)
+			#check there are changes in script file
+			if hexdigest != new_hash_md5.hexdigest():
+
+				apply_message = "Apply merged files? You cannot push your code unless you owned the lates version."
+				reply  = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", apply_message,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
+
+				if reply == QtWidgets.QMessageBox.Ok:
+					checkForApply(toApply,targetDB)
+
+			if name1 != "":
+				os.remove(name1)
+
+			if name2 != "":
+				os.remove(name2)
+
 	else:
 		apply_message = "No difftool found. Please define one in Edit > Preferences > Difftool"
 		reply  = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", apply_message,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
@@ -343,19 +410,141 @@ def checkForApply(mergedFile, targetDB):
 		error_message = "Error applying merged file. Please see log file"
 		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Apply Merged", error_message,  QtWidgets.QMessageBox.Ok)
 
+def CommitChanges(MainWindow):
+	treeView = MainWindow.objListTab
+	# treeView.setSelectionMode(QtWidgets.QAbstractItemView.ContiguousSelection)
+	# treeView.selectAll()
+	# print(treeView.selectedIndexes())
+	item = treeView.invisibleRootItem()
+	selected_items = select_item(item)
+	
+	if len(selected_items) == 0:
+		commit_message = "No item selected to commit."
+		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok)
+	else:
+		commit_message = "You are about to commit changes in database. Continue?"
+		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Cancel)
+		conflicts = []
+
+		if reply == QtWidgets.QMessageBox.Ok:
+
+			if globalvars.engine == "Microsoft SQL Server":
+				rowId = ",".join(selected_items)
+				query = """select case when (select top 1 LoginName from [dbo].[DDLEvents] 
+							where DatabaseName=ws.DatabaseName and SchemaName=ws.SchemaName and ObjectType=ws.ObjectType and ObjectName=ws.ObjectName 
+							order by RowID desc) = ws.LoginName 
+							then 'ok' else 'conflict' end,*
+							from [dbo].[UserWorkspace] ws where RowId in (""" + rowId + """)"""
+				
+				conn = pyodbc.connect(globalvars.connString)
+				cursor = conn.cursor()
+				rows = cursor.execute(query)
+
+				for row in rows:
+					if row[0] == 'conflict':
+						conflicts.append(row)
+			#check for conflicts
+			#initialize conflict list
+			globalvars.MainWindow.conflictList.clear()
+			if len(conflicts) > 0: #conflict detected
+				commit_message = "Conflicting items detected. Kindly review."
+				reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok)
+				globalvars.MainWindow.showConflictTab()
+
+				for conflict in conflicts:
+					citem =  QtWidgets.QListWidgetItem(conflict[4])
+					globalvars.MainWindow.conflictList.addItem(citem)
+
+			else:
+				#check if commit message is empty
+				text = str(globalvars.MainWindow.commitMessage.toPlainText())
+				if text.strip()  == "":
+					commit_message = "Empty commit message"
+					reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok)
+					globalvars.MainWindow.commitMessage.setFocus()
+				else:
+					commitID = ""
+
+					if globalvars.engine == "Microsoft SQL Server":
+
+						commitID = globalvars.server.replace("\\","-")
+
+						rowId = ",".join(selected_items)
+
+						query1 = """insert into [SQLVC].[dbo].[Commits_hdr](CommitID, LoginName, CommitMessage, ChangesetDate)
+										values('""" + commitID + """','""" + globalvars.username + """','""" + text + """',GETDATE())"""
+
+						query1_1 = "select @@IDENTITY"
 
 
-# class dbConn():
-# 	def connect(self, *args):
-# 		self.db_args = locals()
+						conn = pyodbc.connect(globalvars.connString, autocommit=True)
+						cursor = conn.cursor()
+						cursor.execute(query1)
+						ident = cursor.execute(query1_1)
 
-# 		if globalvars.engine == "Microsoft SQL Server":
-# 			return pyodbc.connect(self.db_args)
-
-
-
+						for i in ident:
+							commitID = commitID + "-" + str(i[0])
 
 
+						query2 = """insert into [SQLVC].[dbo].[Commits_dtl](CommitID, DatabaseName, SchemaName, ObjectName, LoginName, ObjectType, ObjectDDL)
+							select '""" + commitID + """',DatabaseName, SchemaName, ObjectName, LoginName, ObjectType,(select top 1 EventDDL from [dbo].[DDLEvents] 
+							where DatabaseName=ws.DatabaseName and SchemaName=ws.SchemaName and ObjectType=ws.ObjectType and ObjectName=ws.ObjectName 
+							order by RowID desc) from [SQLVC].[dbo].[UserWorkspace] ws where RowId in (""" + rowId + """);"""
+
+						cursor.execute(query2)
+						#add delete from workspace here
+
+						conn.close()
+
+
+					commit_message = "Changes has been commited. Commit ID " + commitID + " has been created."
+					reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok)
+					globalvars.MainWindow.commitMessage.document().setPlainText("")
+					#remove items
+					getUserObject()
+
+def getChangesets():
+	if globalvars.engine == "Microsoft SQL Server":
+		conn = pyodbc.connect(globalvars.connString, autocommit=True)
+		cursor = conn.cursor()
+		commits = cursor.execute("select RowId, CommitID, CommitMessage,LoginName,ChangesetDate  from [SQLVC].[dbo].[Commits_hdr] order by RowId desc")
+
+	for commit in commits:
+		citem =  QtWidgets.QListWidgetItem(str(commit[1]) + "-" + str(commit[0]))
+		globalvars.MainWindow.lstCommits.addItem(citem)
+
+
+def select_item(item, mode = 0):
+	# mode 1 = delete
+	selected_item = []
+
+	for i in range(item.childCount()):
+
+		child1 = item.child(i)
+
+		for j in range(child1.childCount()):
+
+			child2 = child1.child(j)
+
+			for k in range(child2.childCount()):
+
+				child3 = child2.child(k)
+
+				for l in range(child3.childCount()):
+					
+					child4 = child3.child(l)
+
+					if child4.checkState(0) == QtCore.Qt.Checked:
+						
+						if mode == 0:
+							rowId = child4.data(QtCore.Qt.UserRole,0)
+
+							selected_item.append(str(rowId))
+
+						if mode == 1:
+							child4.parent().removeChild(child4)
+
+	return selected_item
 
 
 

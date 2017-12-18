@@ -58,6 +58,7 @@ class treeModel():
                 dbObj.setExpanded(True)
                 dbObj.setCheckState(0,QtCore.Qt.Unchecked)
                 dbObj.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+                dbObj.setData(QtCore.Qt.UserRole, 0, row[0])
 
             # for db in databases:
             #     dbObj = QtWidgets.QTreeWidgetItem(server)
@@ -75,4 +76,6 @@ class treeModel():
             #             edit.setExpanded(True)
             #             edit.setCheckState(0,QtCore.Qt.Unchecked)
             #             edit.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+
+    
 

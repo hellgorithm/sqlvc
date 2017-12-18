@@ -5,6 +5,7 @@ import xml.etree.cElementTree as ET
 from treeModel import treeModel
 from functions import *
 from os.path import expanduser
+import platform
 
 
 class SettingsWindow(QtWidgets.QMainWindow):
@@ -150,7 +151,7 @@ class ConnectLayout(QtWidgets.QWidget):
 		super(ConnectLayout, self).__init__()
 		# create and set layout to place widgets
 		grid_layout = QtWidgets.QGridLayout(self)
-		
+
 		#self.text_box = QtWidgets.QTextEdit(self)
 		labelDatabase = QtWidgets.QLabel(self)
 		labelDatabase.setText("Database")
@@ -256,7 +257,11 @@ class MainWindow(QtWidgets.QMainWindow):
 		#Open connection
 		open_action = QtWidgets.QAction('&Open Connection', self)
 		file_menu.addAction(open_action)
-		file_menu.triggered.connect(self.addConnection)
+		open_action.triggered.connect(self.addConnection)
+
+		open_log = QtWidgets.QAction('Open &Logs', self)
+		file_menu.addAction(open_log)
+		open_log.triggered.connect(self.openLogFolder)
 
 		preference_action = QtWidgets.QAction('&Preferences', self)
 		edit_menu.addAction(preference_action)
@@ -268,14 +273,6 @@ class MainWindow(QtWidgets.QMainWindow):
 		about_action = QtWidgets.QAction('&About', self)
 		help_menu.addAction(about_action)
 
-		# # Edit menu
-		# edit_menu = bar.addMenu('Edit')
-		# # adding actions to edit menu
-		# undo_action = QtWidgets.QAction('Undo', self)
-		# redo_action = QtWidgets.QAction('Redo', self)
-		# edit_menu.addAction(undo_action)
-		# edit_menu.addAction(redo_action)
-
 		# use `connect` method to bind signals to desired behavior
 		close_action.triggered.connect(self.close_windows)
 
@@ -286,7 +283,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
 	def close_windows(self):
 		self.close()
-		conn.close()
 
 
 	def addConnection(self):
@@ -303,10 +299,16 @@ class MainWindow(QtWidgets.QMainWindow):
 		frameGm.moveCenter(centerPoint)
 		self.move(frameGm.topLeft())
 
+	def openLogFolder(self):
+		home = expanduser("~")
+		path = home + "/sqlvc/logs"
 
-# class Fn():
-# 	def EventEmmitter(self):
-# 		print("hello")
+		if platform.system() == "Windows":
+			os.startfile(path)
+		elif platform.system() == "Darwin":
+			subprocess.Popen(["open", path])
+		else:
+			subprocess.Popen(["xdg-open", path])
 
 class Layout(QtWidgets.QWidget):
 	def __init__(self, parent=None):
@@ -320,15 +322,28 @@ class Layout(QtWidgets.QWidget):
 		#self.contParentTab_layout = QtWidgets.QGridLayout(self)
 
 		fileList = QtWidgets.QWidget()
+
 		changesetListTab = QtWidgets.QWidget()
+
 		self.contentTab = QtWidgets.QWidget()
+
 		versionTab = QtWidgets.QWidget()
-		lstCommits = QtWidgets.QListWidget(self)
+
+		self.conflictTab = QtWidgets.QWidget()
+
+		self.lstCommits = QtWidgets.QListWidget(self)
+
+		self.commitMessage = QtWidgets.QPlainTextEdit(self)
+		self.commitMessage.setFixedHeight(70)
+		self.btnCommit = QtWidgets.QPushButton("Commit")
+		self.btnCommit.setMaximumWidth(100)
+		self.btnCommit.clicked.connect(lambda: CommitChanges(self))
+
 
 		self.objListTab = QtWidgets.QTreeWidget()
 		self.objListTab.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 		self.objListTab.customContextMenuRequested.connect(self.openMenu)
-		self.objListTab.setHeaderLabels([""])
+		self.objListTab.setHeaderLabels(["Workspace"])
 		self.objListTab.itemDoubleClicked.connect(self.generateObjectScript)
 
 		globalvars.objListTab = self.objListTab
@@ -338,29 +353,44 @@ class Layout(QtWidgets.QWidget):
 		self.versionList = QtWidgets.QListWidget(self)
 		self.versionList.doubleClicked.connect(self.getItemVersionInfo)
 
+
+		self.conflictList = QtWidgets.QListWidget(self)
+
 		self.lstEdited = QtWidgets.QPlainTextEdit(self)
 		self.lstEdited.setReadOnly(True)
 		self.lstEdited.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
 
 		fileParentTab.addTab(fileList, "Objects")
-		fileParentTab.addTab(changesetListTab, "Changesets")
+		fileParentTab.addTab(changesetListTab, "Commits")
+
 		self.contParentTab.addTab(self.contentTab,"Details")
 		self.contParentTab.addTab(versionTab,"Versions")
+		#self.contParentTab.addTab(self.conflictTab, "Conflicts") #hidden
+		self.contParentTab.setTabsClosable(True)
+		self.contParentTab.tabCloseRequested.connect(self.contParentTab.removeTab)
+		#remove close button for other tabs
+		self.contParentTab.tabBar().setTabButton(0, QtWidgets.QTabBar.RightSide,None)
+		self.contParentTab.tabBar().setTabButton(1, QtWidgets.QTabBar.RightSide,None)
 
 		changesetListTab.layout = QtWidgets.QGridLayout(self)
 		fileList.layout = QtWidgets.QGridLayout(self)
 		self.contentTab.layout = QtWidgets.QGridLayout(self)
+		self.conflictTab.layout = QtWidgets.QGridLayout(self)
 		versionTab.layout = QtWidgets.QGridLayout(self)
 
-		changesetListTab.layout.addWidget(lstCommits, 0,0,1,1)
-		fileList.layout.addWidget(self.objListTab,0,0,1,1)
+		changesetListTab.layout.addWidget(self.lstCommits, 0,0,1,1)
+		fileList.layout.addWidget(self.btnCommit,0,0,1,1)
+		fileList.layout.addWidget(self.commitMessage,1,0,1,1)
+		fileList.layout.addWidget(self.objListTab,2,0,1,1)
 		self.contentTab.layout.addWidget(self.lstEdited, 0,0, 1,2)
+		self.conflictTab.layout.addWidget(self.conflictList, 0,0, 1,2)
 		versionTab.layout.addWidget(self.versionList,0,0,1,1)
 
 		changesetListTab.setLayout(changesetListTab.layout)
 		fileList.setLayout(fileList.layout)
 		self.contentTab.setLayout(self.contentTab.layout)
 		versionTab.setLayout(versionTab.layout)
+		self.conflictTab.setLayout(self.conflictTab.layout)
 
 		# end tab
 
@@ -388,6 +418,10 @@ class Layout(QtWidgets.QWidget):
 		# grid_layout.addWidget(self.open_button, 2, 2)
 		# grid_layout.addWidget(self.quit_button, 2, 3)
 		globalvars.MainWindow = self
+
+	def showConflictTab(self):
+		self.contParentTab.addTab(self.conflictTab, "Conflicts")
+		self.contParentTab.setCurrentIndex(2)
 
 	def getItemVersionInfo(self):
 		rowId = self.versionList.selectedItems()[0].data(QtCore.Qt.UserRole)

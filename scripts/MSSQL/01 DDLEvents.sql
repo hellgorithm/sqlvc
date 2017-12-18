@@ -26,3 +26,22 @@ CREATE TABLE [dbo].[UserWorkspace](
 	[LoginName] [varchar](max) NULL,
 	[ObjectType] [varchar](max) NULL
 ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+
+CREATE TABLE [dbo].[Commits_hdr](
+	[RowID] [int] IDENTITY(1,1) NOT NULL,
+	[CommitID] [varchar](max) NULL,
+	[LoginName] [varchar](max) NULL,
+	[ChangesetDate] [datetime] default GETDATE(),
+	[CommitMessage] [varchar](max) NULL,
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+
+CREATE TABLE [dbo].[Commits_dtl](
+	[RowID] [int] IDENTITY(1,1) NOT NULL,
+	[CommitID] [varchar](max) NULL,
+	[DatabaseName] [varchar](max) NULL,
+	[SchemaName] [varchar](max) NULL,
+	[ObjectName] [varchar](max) NULL,
+	[LoginName] [varchar](max) NULL,
+	[ObjectType] [varchar](max) NULL,
+	[ObjectDDL] [varchar](max) NULL
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
