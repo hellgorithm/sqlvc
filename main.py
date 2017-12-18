@@ -7,6 +7,111 @@ from functions import *
 from os.path import expanduser
 
 
+class SettingsWindow(QtWidgets.QMainWindow):
+	def __init__(self, parent=None):
+		super(SettingsWindow,self).__init__()
+
+		self.layout = SettingsLayout(parent=self)
+		self.setWindowTitle("Settings")
+		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
+		self.setCentralWidget(self.layout)
+		self.resize(250, 130)
+		# self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
+		self.center()
+		globalvars.sett = self
+
+	def center(self):
+		frameGm = self.frameGeometry()
+		screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
+		centerPoint = QtWidgets.QApplication.desktop().screenGeometry(screen).center()
+		frameGm.moveCenter(centerPoint)
+		self.move(frameGm.topLeft())
+
+class SettingsLayout(QtWidgets.QWidget):
+	def __init__(self, parent=None):
+		super(SettingsLayout, self).__init__()
+		grid_layout = QtWidgets.QGridLayout(self)
+
+		labelDiffTool = QtWidgets.QLabel(self)
+		labelDiffTool.setText("Diff Tool")
+		grid_layout.addWidget(labelDiffTool, 0, 0, 1, 3)
+
+		self.txtExePath = QtWidgets.QLineEdit(self)
+		grid_layout.addWidget(self.txtExePath, 1, 0, 1, 2)
+
+		btnBrowseExe = QtWidgets.QPushButton("Browse")
+		grid_layout.addWidget(btnBrowseExe, 1, 2, 1, 1)
+		btnBrowseExe.clicked.connect(self.openFileExplorer)
+
+		self.btnSaveExe = QtWidgets.QPushButton("Save")
+		grid_layout.addWidget(self.btnSaveExe, 2, 1, 1, 1)
+		self.btnSaveExe.clicked.connect(self.saveExePath)
+
+		self.btnCancel = QtWidgets.QPushButton("Cancel")
+		grid_layout.addWidget(self.btnCancel, 2, 2, 1, 1)
+		self.btnCancel.clicked.connect(self.closeSett)
+
+	def closeSett(self):
+		sett.close()
+
+	def openFileExplorer(self):
+		difftool = str(QtWidgets.QFileDialog.getOpenFileName(self, "Select Difftool")[0])
+		self.txtExePath.setText(difftool)
+
+	def readExePath(self):
+		exePath = self.txtExePath.text()
+		home = expanduser("~")
+		homeConfigPath = home + "/sqlvc/sqlvc-config.xml"
+
+		root = ET.parse(homeConfigPath).getroot()
+
+		tool = root.find('difftool')
+		path = ""
+
+		# if tool == None:
+		# 	path = ""
+		# else:
+		# 	path = tool.text
+
+		# self.txtExePath.setText(path)
+		if tool == None:
+			return ""
+		else:
+			return tool.text
+
+
+
+	def saveExePath(self):
+		try:
+			exePath = self.txtExePath.text()
+			home = expanduser("~")
+			homeConfigPath = home + "/sqlvc/sqlvc-config.xml"
+
+			root = ET.parse(homeConfigPath).getroot()
+
+			tool = root.find('difftool')
+
+			if tool == None:
+				tool = ET.SubElement(root, "difftool")
+
+			tool.text = str(exePath)
+
+
+			tree = ET.ElementTree(root)
+			tree.write(homeConfigPath)
+
+			success_message = "Successfully saved config file."
+			reply = QtWidgets.QMessageBox.question(self, "Success!", success_message,  QtWidgets.QMessageBox.Ok)
+		except Exception as e:
+			saveLog(e)
+			error_message = "Error saving config! Please see log file"
+			reply = QtWidgets.QMessageBox.question(self, "Error!", error_message,  QtWidgets.QMessageBox.Ok)
+
+
+
+
+
+
 class ConnectionWindow(QtWidgets.QMainWindow):
 	def __init__(self, parent=None):
 		super(ConnectionWindow,self).__init__()
@@ -45,7 +150,7 @@ class ConnectLayout(QtWidgets.QWidget):
 		super(ConnectLayout, self).__init__()
 		# create and set layout to place widgets
 		grid_layout = QtWidgets.QGridLayout(self)
-
+		
 		#self.text_box = QtWidgets.QTextEdit(self)
 		labelDatabase = QtWidgets.QLabel(self)
 		labelDatabase.setText("Database")
@@ -145,12 +250,17 @@ class MainWindow(QtWidgets.QMainWindow):
 
 		# File menu
 		file_menu = bar.addMenu('&File')
+		edit_menu = bar.addMenu('&Edit')
 		help_menu = bar.addMenu('&Help')
 
 		#Open connection
 		open_action = QtWidgets.QAction('&Open Connection', self)
 		file_menu.addAction(open_action)
 		file_menu.triggered.connect(self.addConnection)
+
+		preference_action = QtWidgets.QAction('&Preferences', self)
+		edit_menu.addAction(preference_action)
+		edit_menu.triggered.connect(self.openPreference)
 
 		close_action = QtWidgets.QAction('&Quit', self)
 		file_menu.addAction(close_action)
@@ -167,7 +277,16 @@ class MainWindow(QtWidgets.QMainWindow):
 		# edit_menu.addAction(redo_action)
 
 		# use `connect` method to bind signals to desired behavior
-		close_action.triggered.connect(self.close)
+		close_action.triggered.connect(self.close_windows)
+
+	def openPreference(self):
+		exePath = sett.layout.readExePath()
+		sett.layout.txtExePath.setText(exePath)
+		sett.show()
+
+	def close_windows(self):
+		self.close()
+		conn.close()
 
 
 	def addConnection(self):
@@ -197,88 +316,50 @@ class Layout(QtWidgets.QWidget):
 		grid_layout = QtWidgets.QGridLayout(self)
 
 		fileParentTab = QtWidgets.QTabWidget()
-		contParentTab = QtWidgets.QTabWidget()
-		#contParentTab_layout = QtWidgets.QGridLayout(self)
+		self.contParentTab = QtWidgets.QTabWidget()
+		#self.contParentTab_layout = QtWidgets.QGridLayout(self)
 
 		fileList = QtWidgets.QWidget()
 		changesetListTab = QtWidgets.QWidget()
-		contentTab = QtWidgets.QWidget()
+		self.contentTab = QtWidgets.QWidget()
 		versionTab = QtWidgets.QWidget()
-
-		#self.text_box = QtWidgets.QTextEdit(self)
-		# labelEdited = QtWidgets.QLabel(self)
-		# labelEdited.setText("Edited Objects")
-		# grid_layout.addWidget(labelEdited, 0, 0, 1, 1)
-		
-
 		lstCommits = QtWidgets.QListWidget(self)
 
-		# model = treeModel()
-		# self.trViewObjects = QtWidgets.QTreeView(self)
-		# self.trViewObjects.setModel(model.models())
-		# self.trViewObjects.expandToDepth(2)
-
-		# self.trViewObjects.doubleClicked.connect(lambda: EventEmmitter(self.trViewObjects))
-
-
-		dat = {
-			"ZERO-VM\DEV" : {
-				"HuManEDGE" : {
-					"Tables" : [],
-					"Views" : [],
-					"Stored Procedures" : [],
-					"Functions" : [] 
-				}, 
-				"HuManEDGECLIENT" : {
-					"Tables" : [],
-					"Views" : [],
-					"Stored Procedures" : [],
-					"Functions" : [] 
-				}
-			}
-		}
-
-		trViewObjects = treeModel()
 		self.objListTab = QtWidgets.QTreeWidget()
 		self.objListTab.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 		self.objListTab.customContextMenuRequested.connect(self.openMenu)
 		self.objListTab.setHeaderLabels([""])
-		trViewObjects.generateView(self.objListTab, dat)
+		self.objListTab.itemDoubleClicked.connect(self.generateObjectScript)
 
-		#self.objListTab.customContextMenuRequested.connect(trViewObjects.openMenu)
-
-		#p.addChild(item) 
-
-		# item = QtWidgets.QTreeViewItem(self.trViewObjects)
-		# item.setCheckState(0, QtCore.Qt.Unchecked)
-
-		#trViewObjects.setExpanded(0, True)
-		#self.versionList = QtWidgets.QListWidget(self)
-		#grid_layout.addWidget(self.versionList, 1, 2, 1, 2)
+		globalvars.objListTab = self.objListTab
 
 		#tab
 
-		versionList = QtWidgets.QListWidget(self)
-		lstEdited = QtWidgets.QPlainTextEdit(self)
+		self.versionList = QtWidgets.QListWidget(self)
+		self.versionList.doubleClicked.connect(self.getItemVersionInfo)
+
+		self.lstEdited = QtWidgets.QPlainTextEdit(self)
+		self.lstEdited.setReadOnly(True)
+		self.lstEdited.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
 
 		fileParentTab.addTab(fileList, "Objects")
 		fileParentTab.addTab(changesetListTab, "Changesets")
-		contParentTab.addTab(contentTab,"Details")
-		contParentTab.addTab(versionTab,"Versions")
+		self.contParentTab.addTab(self.contentTab,"Details")
+		self.contParentTab.addTab(versionTab,"Versions")
 
 		changesetListTab.layout = QtWidgets.QGridLayout(self)
 		fileList.layout = QtWidgets.QGridLayout(self)
-		contentTab.layout = QtWidgets.QGridLayout(self)
+		self.contentTab.layout = QtWidgets.QGridLayout(self)
 		versionTab.layout = QtWidgets.QGridLayout(self)
 
 		changesetListTab.layout.addWidget(lstCommits, 0,0,1,1)
 		fileList.layout.addWidget(self.objListTab,0,0,1,1)
-		contentTab.layout.addWidget(lstEdited, 0,0, 1,2)
-		versionTab.layout.addWidget(versionList,0,0,1,1)
+		self.contentTab.layout.addWidget(self.lstEdited, 0,0, 1,2)
+		versionTab.layout.addWidget(self.versionList,0,0,1,1)
 
 		changesetListTab.setLayout(changesetListTab.layout)
 		fileList.setLayout(fileList.layout)
-		contentTab.setLayout(contentTab.layout)
+		self.contentTab.setLayout(self.contentTab.layout)
 		versionTab.setLayout(versionTab.layout)
 
 		# end tab
@@ -288,7 +369,7 @@ class Layout(QtWidgets.QWidget):
 
 		#end treeview
 
-		grid_layout.addWidget(contParentTab, 1, 0, 1, 2)
+		grid_layout.addWidget(self.contParentTab, 1, 0, 1, 2)
 		grid_layout.addWidget(fileParentTab, 1, 2, 1, 2) #row, column, height, width
 		# self.scriptDetails = QtWidgets.QListWidget(self)
 		# tab_layout.addWidget(self.scriptDetails, 0, 2, 1, 2)
@@ -306,6 +387,13 @@ class Layout(QtWidgets.QWidget):
 		# grid_layout.addWidget(self.clear_button, 2, 1)
 		# grid_layout.addWidget(self.open_button, 2, 2)
 		# grid_layout.addWidget(self.quit_button, 2, 3)
+		globalvars.MainWindow = self
+
+	def getItemVersionInfo(self):
+		rowId = self.versionList.selectedItems()[0].data(QtCore.Qt.UserRole)
+		script = generateObjectScript(None, None, None, None, rowId)
+		self.lstEdited.document().setPlainText(script);
+		self.contParentTab.setCurrentIndex(0)
 
 	def openMenu(self, position):
 
@@ -314,13 +402,61 @@ class Layout(QtWidgets.QWidget):
 		if indexes == []:
 			menu = QtWidgets.QMenu()
 			menu.addAction(self.tr("View Object/Info"))
-			menu.addAction(self.tr("Compare to latest"))
+			menu.triggered.connect(self.generateObjectScript)
+
+			compareLatest = menu.addAction(self.tr("Compare to latest"))
+			compareLatest.triggered.connect(self.compareToLatest)
+
 			menu.addAction(self.tr("Compare to other versions"))
 			menu.addAction(self.tr("Compare to other commits"))
 			menu.addAction(self.tr("Revert to previous state"))
 			menu.addAction(self.tr("Include/Exclude"))
 
 			menu.exec_(self.objListTab.viewport().mapToGlobal(position))
+
+	def compareToLatest(self):
+		if self.objListTab.selectedIndexes() == []:
+			item = self.objListTab.currentItem()
+			itemText = item.text(0)
+
+			dbObjType = item.parent()
+			dbObjTypeText = dbObjType.text(0)
+
+			database = dbObjType.parent()
+			databaseText = database.text(0)
+
+			downloadToCompare(globalvars.username, databaseText, dbObjTypeText, itemText, databaseText, dbObjTypeText, itemText, 'compareLatest')
+
+	def generateObjectScript(self):
+		if self.objListTab.selectedIndexes() == []:
+			item = self.objListTab.currentItem()
+			itemText = item.text(0)
+
+			dbObjType = item.parent()
+			dbObjTypeText = dbObjType.text(0)
+
+			database = dbObjType.parent()
+			databaseText = database.text(0)
+
+			objScript = generateObjectScript(globalvars.username, databaseText, dbObjTypeText, itemText)
+			versionList = generateVersionList(databaseText, dbObjTypeText, itemText)
+
+			latest = " ("+globalvars.username+"'s latest version)"
+
+			self.versionList.clear() #clear items first
+			for version in versionList: #iterate
+				#latest by user flag
+				flag = ""
+				if version[1] == globalvars.username:
+					flag = latest
+					latest = ""
+
+				item = QtWidgets.QListWidgetItem(version[2] + '.' + version[3] + '.' + version[4] + ' modified last ' + str(version[5]) + ' by ' + version[1] + flag)
+				item.setData(QtCore.Qt.UserRole, version[6])
+				#item.itemDoubleClicked.connect(lambda:generateObjectScript(None, None, None, None, version[6]))
+				self.versionList.addItem(item)
+
+			self.lstEdited.document().setPlainText(objScript);
 
 
 if __name__ == '__main__':
@@ -330,5 +466,7 @@ if __name__ == '__main__':
 	mw.show()
 
 	conn = ConnectionWindow()
+
+	sett = SettingsWindow()
 	
 	sys.exit(app.exec_())

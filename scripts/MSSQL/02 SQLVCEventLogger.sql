@@ -15,6 +15,21 @@ BEGIN
                 FROM sys.dm_exec_connections
                 WHERE session_id = @@SPID
         );
+
+    --check if object is already in user's workspace, if not...add one 
+    IF NOT EXISTS(SELECT * FROM SQLVC.dbo.UserWorkspace WHERE 
+                DatabaseName=@EventData.value('(/EVENT_INSTANCE/DatabaseName)[1]',  'NVARCHAR(255)') and 
+                SchemaName=@EventData.value('(/EVENT_INSTANCE/SchemaName)[1]',  'NVARCHAR(255)') and 
+                ObjectName=@EventData.value('(/EVENT_INSTANCE/ObjectName)[1]',  'NVARCHAR(255)') and 
+                ObjectType=@EventData.value('(/EVENT_INSTANCE/ObjectType)[1]',  'NVARCHAR(255)') and 
+                LoginName=SUSER_SNAME())
+                begin
+                    INSERT INTO SQLVC.dbo.UserWorkspace(DatabaseName, SchemaName, ObjectName, ObjectType, LoginName)
+                    values(@EventData.value('(/EVENT_INSTANCE/DatabaseName)[1]',  'NVARCHAR(255)'),
+                    @EventData.value('(/EVENT_INSTANCE/SchemaName)[1]',  'NVARCHAR(255)'),
+                    @EventData.value('(/EVENT_INSTANCE/ObjectName)[1]',  'NVARCHAR(255)'),
+                    @EventData.value('(/EVENT_INSTANCE/ObjectType)[1]',  'NVARCHAR(255)'), SUSER_NAME())
+                end;
  
     INSERT SQLVC.dbo.DDLEvents
     (
@@ -27,7 +42,8 @@ BEGIN
         HostName,
         IPAddress,
         ProgramName,
-        LoginName
+        LoginName,
+        EventDate
     )
     SELECT
         @EventData.value('(/EVENT_INSTANCE/EventType)[1]',   'NVARCHAR(100)'), 
@@ -39,7 +55,8 @@ BEGIN
         HOST_NAME(),
         @ip,
         PROGRAM_NAME(),
-        SUSER_SNAME();
+        SUSER_SNAME(),
+        GETDATE();
 END
 
 
