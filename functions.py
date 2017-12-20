@@ -7,10 +7,10 @@ import time
 from treeModel import treeModel
 import tempfile
 import subprocess, threading
-import hashlib
-from Crypto.Cipher import AES
-from Crypto.Hash import SHA256
-import base64
+# import hashlib
+# from Crypto.Cipher import AES
+# from Crypto.Hash import SHA256
+# import base64
 import uuid
 
 
@@ -219,7 +219,7 @@ def saveConfigurations(path, connWin = None):
 				instance=str(connWin.cmbServers.currentText()),
 				authentication = str(connWin.cmbAuthType.currentText()),
 				user = str(connWin.txtUserName.text()),
-				password=encoded).text = str(connWin.cmbServers.currentText())
+				password="").text = str(connWin.cmbServers.currentText())
 
 		for instance in root.findall("instances/instance"):
 			if instance.attrib["instance"] == str(connWin.cmbServers.currentText()):
@@ -245,8 +245,13 @@ def readConnConfiguration(path, connWin = None):
 			connWin.layout.cmbServers.addItem(instance.attrib["instance"])
 
 			if instance.attrib["selected"] == "1":
-				connWin.layout.cmbServers.setCurrentIndex(cmbIndex)
-				connWin.layout.cmbAuthType.setCurrentIndex(cmbIndex)
+
+				serverIndex = connWin.layout.cmbServers.findText(instance.attrib["instance"])
+				connWin.layout.cmbServers.setCurrentIndex(serverIndex)
+
+				authIndex = connWin.layout.cmbAuthType.findText(instance.attrib["authentication"])
+				connWin.layout.cmbAuthType.setCurrentIndex(authIndex)
+
 				connWin.layout.txtUserName.setText(instance.attrib["user"])
 				connWin.layout.txtPassword.setText("")
 
@@ -339,8 +344,8 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 	name1 = ""
 	name2 = ""
 	targetDB = ""
-	hash_md5 = hashlib.md5()
-	hexdigest = ""
+	# hash_md5 = hashlib.md5()
+	# hexdigest = ""
 
 	if globalvars.engine == "Microsoft SQL Server":
 		if compareType == "compareLatest": #compare your edits to currently applied
@@ -348,8 +353,8 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 			name2 = compare_directory + objName2 + "_LATEST_USERVERSION.sql"
 			obj1 = generateObjectScript('', db1, objType1, objName1) #latest version of the script
 			obj2 = generateObjectScript(user, db2, objType2, objName2) #latest version of the user
-			hash_md5.update(obj2)
-			hexdigest = hash_md5.hexdigest()
+			# hash_md5.update(obj2.encode("utf-8"))
+			# hexdigest = hash_md5.hexdigest()
 			targetDB = db2
 
 	c1 = open(name1, "w")
@@ -368,19 +373,23 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 		rc = p.returncode
 		
 		if rc == 0:
-			new_hash_md5 = hashlib.md5()
-			merged = open(name2, "r")
+			
+			#new_hash_md5 = hashlib.md5()
+			
+			merged = open(name2, "rb")
 			toApply = merged.read()
-			new_hash_md5.update(toApply)
+			merged.close()
+
+			#new_hash_md5.update(toApply.encode("utf-8"))
 
 			#check there are changes in script file
-			if hexdigest != new_hash_md5.hexdigest():
+			#if hexdigest != new_hash_md5.hexdigest():
 
-				apply_message = "Apply merged files? You cannot push your code unless you owned the lates version."
-				reply  = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", apply_message,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
+			apply_message = "Apply merged files? You cannot push your code unless you owned the lates version."
+			reply  = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", apply_message,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
 
-				if reply == QtWidgets.QMessageBox.Ok:
-					checkForApply(toApply,targetDB)
+			if reply == QtWidgets.QMessageBox.Ok:
+				checkForApply(toApply,targetDB)
 
 			if name1 != "":
 				os.remove(name1)
@@ -504,14 +513,21 @@ def CommitChanges(MainWindow):
 					getUserObject()
 
 def getChangesets():
+	#globalvars.MainWindow.lstCommits.clear()
 	if globalvars.engine == "Microsoft SQL Server":
 		conn = pyodbc.connect(globalvars.connString, autocommit=True)
 		cursor = conn.cursor()
-		commits = cursor.execute("select RowId, CommitID, CommitMessage,LoginName,ChangesetDate  from [SQLVC].[dbo].[Commits_hdr] order by RowId desc")
+		commits = cursor.execute("select RowId, CommitID, CommitMessage,LoginName,ChangesetDate  from [SQLVC].[dbo].[Commits_hdr] order by RowId asc")
 
 	for commit in commits:
-		citem =  QtWidgets.QListWidgetItem(str(commit[1]) + "-" + str(commit[0]))
-		globalvars.MainWindow.lstCommits.addItem(citem)
+		# citem =  QtWidgets.QListWidgetItem(str(commit[1]) + "-" + str(commit[0]))
+		# globalvars.MainWindow.lstCommits.addItem(citem)
+		commitID = str(commit[1]) + "-" + str(commit[0])
+		user = str(commit[3])
+		commitMessaage = str(commit[2])
+		date = str(commit[4])
+
+		globalvars.MainWindow.addCommit(globalvars.MainWindow.lstCommitsModel, commitID, user, commitMessaage,date)
 
 
 def select_item(item, mode = 0):

@@ -8,6 +8,61 @@ from os.path import expanduser
 import platform
 
 
+class CompareOther(QtWidgets.QMainWindow): #compare selection for other version and changeset
+	def __init__(self, parent=None):
+		super(CompareOther,self).__init__()
+
+		self.layout = CompareLayout(parent=self)
+		self.setWindowTitle("Settings")
+		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
+		self.setCentralWidget(self.layout)
+		self.resize(500, 500)
+		# self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
+		self.center()
+		#globalvars.sett = self
+
+	def center(self):
+		frameGm = self.frameGeometry()
+		screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
+		centerPoint = QtWidgets.QApplication.desktop().screenGeometry(screen).center()
+		frameGm.moveCenter(centerPoint)
+		self.move(frameGm.topLeft())
+
+class CompareLayout(QtWidgets.QWidget):
+
+	OBJ_DATABASE, OBJ_SCHEMA, OBJ_NAME, USER, DATE = range(5) 
+
+	def __init__(self, parent=None):
+		super(CompareLayout, self).__init__()
+		grid_layout = QtWidgets.QGridLayout(self)
+
+		self.lstCompareObj = QtWidgets.QTreeView(self)
+		self.lstCompareObj.setRootIsDecorated(False)
+		self.lstCompareObj.setAlternatingRowColors(True)
+
+		self.lstCompareModel = self.createCompareModel(self)
+		
+		self.lstCompareObj.setModel(self.lstCompareModel)
+
+		grid_layout.addWidget(self.lstCompareObj, 1, 0, 1, 2)
+
+	def createCompareModel(self,parent):
+		model = QtGui.QStandardItemModel(0, 5, parent)
+		model.setHeaderData(self.OBJ_DATABASE, QtCore.Qt.Horizontal, "Database")
+		model.setHeaderData(self.OBJ_SCHEMA, QtCore.Qt.Horizontal, "Schema")
+		model.setHeaderData(self.OBJ_NAME, QtCore.Qt.Horizontal, "Object Name")
+		model.setHeaderData(self.USER, QtCore.Qt.Horizontal, "Login Name")
+		model.setHeaderData(self.DATE, QtCore.Qt.Horizontal, "Date")
+		return model
+
+	def addCompare(self,model, database, schema, objName, user, date):
+		model.insertRow(0)
+		model.setData(model.index(0, self.OBJ_DATABASE), database)
+		model.setData(model.index(0, self.OBJ_SCHEMA), schema)
+		model.setData(model.index(0, self.OBJ_NAME), objName)
+		model.setData(model.index(0, self.USER), user)
+		model.setData(model.index(0, self.DATE), date)
+
 class SettingsWindow(QtWidgets.QMainWindow):
 	def __init__(self, parent=None):
 		super(SettingsWindow,self).__init__()
@@ -108,11 +163,6 @@ class SettingsLayout(QtWidgets.QWidget):
 			error_message = "Error saving config! Please see log file"
 			reply = QtWidgets.QMessageBox.question(self, "Error!", error_message,  QtWidgets.QMessageBox.Ok)
 
-
-
-
-
-
 class ConnectionWindow(QtWidgets.QMainWindow):
 	def __init__(self, parent=None):
 		super(ConnectionWindow,self).__init__()
@@ -143,8 +193,6 @@ class ConnectionWindow(QtWidgets.QMainWindow):
 		centerPoint = QtWidgets.QApplication.desktop().screenGeometry(screen).center()
 		frameGm.moveCenter(centerPoint)
 		self.move(frameGm.topLeft())
-
-
 
 class ConnectLayout(QtWidgets.QWidget):
 	def __init__(self, parent=None):
@@ -230,10 +278,6 @@ class ConnectLayout(QtWidgets.QWidget):
 		else:
 			self.txtUserName.setText("")
 
-
-
-
-
 class MainWindow(QtWidgets.QMainWindow):
 	def __init__(self, parent=None):
 		super(MainWindow,self).__init__()
@@ -311,6 +355,10 @@ class MainWindow(QtWidgets.QMainWindow):
 			subprocess.Popen(["xdg-open", path])
 
 class Layout(QtWidgets.QWidget):
+
+	#define model for commit
+	COMMIT_ID, COMMIT_USER, COMMIT_MESSAGE, COMMIT_DATE = range(4)
+
 	def __init__(self, parent=None):
 		super(Layout, self).__init__()
 		# create and set layout to place widgets
@@ -331,7 +379,18 @@ class Layout(QtWidgets.QWidget):
 
 		self.conflictTab = QtWidgets.QWidget()
 
-		self.lstCommits = QtWidgets.QListWidget(self)
+		#self.lstCommits = QtWidgets.QListWidget(self)
+		self.lstCommits = QtWidgets.QTreeView(self)
+
+		self.lstCommits.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+		self.lstCommits.setRootIsDecorated(False)
+		self.lstCommits.setAlternatingRowColors(True)
+
+		self.lstCommitsModel = self.createCommitModel(self)
+		
+		self.lstCommits.setModel(self.lstCommitsModel)
+		#self.addCommit(self.lstCommitsModel, 'service@github.com','soggy', 'Your Github Donation','03/25/2017 02:05 PM')
+
 
 		self.commitMessage = QtWidgets.QPlainTextEdit(self)
 		self.commitMessage.setFixedHeight(70)
@@ -419,6 +478,23 @@ class Layout(QtWidgets.QWidget):
 		# grid_layout.addWidget(self.quit_button, 2, 3)
 		globalvars.MainWindow = self
 
+	#commit table creator
+	def createCommitModel(self,parent):
+		model = QtGui.QStandardItemModel(0, 4, parent)
+		model.setHeaderData(self.COMMIT_ID, QtCore.Qt.Horizontal, "Commit ID")
+		model.setHeaderData(self.COMMIT_USER, QtCore.Qt.Horizontal, "User")
+		model.setHeaderData(self.COMMIT_MESSAGE, QtCore.Qt.Horizontal, "Commit Message")
+		model.setHeaderData(self.COMMIT_DATE, QtCore.Qt.Horizontal, "Date")
+		return model
+
+	def addCommit(self,model, commitID, user, message, date):
+		model.insertRow(0)
+		model.setData(model.index(0, self.COMMIT_ID), commitID)
+		model.setData(model.index(0, self.COMMIT_USER), user)
+		model.setData(model.index(0, self.COMMIT_MESSAGE), message)
+		model.setData(model.index(0, self.COMMIT_DATE), date)
+	#end commit table creator
+
 	def showConflictTab(self):
 		self.contParentTab.addTab(self.conflictTab, "Conflicts")
 		self.contParentTab.setCurrentIndex(2)
@@ -435,20 +511,26 @@ class Layout(QtWidgets.QWidget):
 
 		if indexes == []:
 			menu = QtWidgets.QMenu()
-			menu.addAction(self.tr("View Object/Info"))
-			menu.triggered.connect(self.generateObjectScript)
+			generate = menu.addAction(self.tr("View Object/Info"))
+			generate.triggered.connect(self.generateObjectScript)
 
 			compareLatest = menu.addAction(self.tr("Compare to latest"))
 			compareLatest.triggered.connect(self.compareToLatest)
 
-			menu.addAction(self.tr("Compare to other versions"))
+			compareVersion = menu.addAction(self.tr("Compare to other versions"))
+			compareVersion.triggered.connect(self.compareOtherVersion)
+
 			menu.addAction(self.tr("Compare to other commits"))
 			menu.addAction(self.tr("Revert to previous state"))
 			menu.addAction(self.tr("Include/Exclude"))
 
 			menu.exec_(self.objListTab.viewport().mapToGlobal(position))
 
+	def compareOtherVersion(self):
+		compare.show()
+
 	def compareToLatest(self):
+		print("Comparing to latest version")
 		if self.objListTab.selectedIndexes() == []:
 			item = self.objListTab.currentItem()
 			itemText = item.text(0)
@@ -462,6 +544,7 @@ class Layout(QtWidgets.QWidget):
 			downloadToCompare(globalvars.username, databaseText, dbObjTypeText, itemText, databaseText, dbObjTypeText, itemText, 'compareLatest')
 
 	def generateObjectScript(self):
+		print("Viewing script info")
 		if self.objListTab.selectedIndexes() == []:
 			item = self.objListTab.currentItem()
 			itemText = item.text(0)
@@ -502,5 +585,7 @@ if __name__ == '__main__':
 	conn = ConnectionWindow()
 
 	sett = SettingsWindow()
+
+	compare = CompareOther()
 	
 	sys.exit(app.exec_())

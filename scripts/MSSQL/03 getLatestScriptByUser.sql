@@ -1,4 +1,4 @@
-ALTER PROCEDURE getLatestScriptByUser @user varchar(max), @database varchar(max), @objType varchar(max), @objName varchar(max)
+CREATE PROCEDURE getLatestScriptByUser @user varchar(max), @database varchar(max), @objType varchar(max), @objName varchar(max)
 AS
 BEGIN
 
