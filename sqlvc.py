@@ -5,278 +5,11 @@ import xml.etree.cElementTree as ET
 from treeModel import treeModel
 from functions import *
 from os.path import expanduser
-import platform
 
-
-class CompareOther(QtWidgets.QMainWindow): #compare selection for other version and changeset
-	def __init__(self, parent=None):
-		super(CompareOther,self).__init__()
-
-		self.layout = CompareLayout(parent=self)
-		self.setWindowTitle("Settings")
-		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
-		self.setCentralWidget(self.layout)
-		self.resize(500, 500)
-		# self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
-		self.center()
-		#globalvars.sett = self
-
-	def center(self):
-		frameGm = self.frameGeometry()
-		screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
-		centerPoint = QtWidgets.QApplication.desktop().screenGeometry(screen).center()
-		frameGm.moveCenter(centerPoint)
-		self.move(frameGm.topLeft())
-
-class CompareLayout(QtWidgets.QWidget):
-
-	OBJ_DATABASE, OBJ_SCHEMA, OBJ_NAME, USER, DATE = range(5) 
-
-	def __init__(self, parent=None):
-		super(CompareLayout, self).__init__()
-		grid_layout = QtWidgets.QGridLayout(self)
-
-		self.lstCompareObj = QtWidgets.QTreeView(self)
-		self.lstCompareObj.setRootIsDecorated(False)
-		self.lstCompareObj.setAlternatingRowColors(True)
-
-		self.lstCompareModel = self.createCompareModel(self)
-		
-		self.lstCompareObj.setModel(self.lstCompareModel)
-
-		grid_layout.addWidget(self.lstCompareObj, 1, 0, 1, 2)
-
-	def createCompareModel(self,parent):
-		model = QtGui.QStandardItemModel(0, 5, parent)
-		model.setHeaderData(self.OBJ_DATABASE, QtCore.Qt.Horizontal, "Database")
-		model.setHeaderData(self.OBJ_SCHEMA, QtCore.Qt.Horizontal, "Schema")
-		model.setHeaderData(self.OBJ_NAME, QtCore.Qt.Horizontal, "Object Name")
-		model.setHeaderData(self.USER, QtCore.Qt.Horizontal, "Login Name")
-		model.setHeaderData(self.DATE, QtCore.Qt.Horizontal, "Date")
-		return model
-
-	def addCompare(self,model, database, schema, objName, user, date):
-		model.insertRow(0)
-		model.setData(model.index(0, self.OBJ_DATABASE), database)
-		model.setData(model.index(0, self.OBJ_SCHEMA), schema)
-		model.setData(model.index(0, self.OBJ_NAME), objName)
-		model.setData(model.index(0, self.USER), user)
-		model.setData(model.index(0, self.DATE), date)
-
-class SettingsWindow(QtWidgets.QMainWindow):
-	def __init__(self, parent=None):
-		super(SettingsWindow,self).__init__()
-
-		self.layout = SettingsLayout(parent=self)
-		self.setWindowTitle("Settings")
-		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
-		self.setCentralWidget(self.layout)
-		self.resize(250, 130)
-		# self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
-		self.center()
-		globalvars.sett = self
-
-	def center(self):
-		frameGm = self.frameGeometry()
-		screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
-		centerPoint = QtWidgets.QApplication.desktop().screenGeometry(screen).center()
-		frameGm.moveCenter(centerPoint)
-		self.move(frameGm.topLeft())
-
-class SettingsLayout(QtWidgets.QWidget):
-	def __init__(self, parent=None):
-		super(SettingsLayout, self).__init__()
-		grid_layout = QtWidgets.QGridLayout(self)
-
-		labelDiffTool = QtWidgets.QLabel(self)
-		labelDiffTool.setText("Diff Tool")
-		grid_layout.addWidget(labelDiffTool, 0, 0, 1, 3)
-
-		self.txtExePath = QtWidgets.QLineEdit(self)
-		grid_layout.addWidget(self.txtExePath, 1, 0, 1, 2)
-
-		btnBrowseExe = QtWidgets.QPushButton("Browse")
-		grid_layout.addWidget(btnBrowseExe, 1, 2, 1, 1)
-		btnBrowseExe.clicked.connect(self.openFileExplorer)
-
-		self.btnSaveExe = QtWidgets.QPushButton("Save")
-		grid_layout.addWidget(self.btnSaveExe, 2, 1, 1, 1)
-		self.btnSaveExe.clicked.connect(self.saveExePath)
-
-		self.btnCancel = QtWidgets.QPushButton("Cancel")
-		grid_layout.addWidget(self.btnCancel, 2, 2, 1, 1)
-		self.btnCancel.clicked.connect(self.closeSett)
-
-	def closeSett(self):
-		sett.close()
-
-	def openFileExplorer(self):
-		difftool = str(QtWidgets.QFileDialog.getOpenFileName(self, "Select Difftool")[0])
-		self.txtExePath.setText(difftool)
-
-	def readExePath(self):
-		exePath = self.txtExePath.text()
-		home = expanduser("~")
-		homeConfigPath = home + "/sqlvc/sqlvc-config.xml"
-
-		root = ET.parse(homeConfigPath).getroot()
-
-		tool = root.find('difftool')
-		path = ""
-
-		# if tool == None:
-		# 	path = ""
-		# else:
-		# 	path = tool.text
-
-		# self.txtExePath.setText(path)
-		if tool == None:
-			return ""
-		else:
-			return tool.text
-
-
-
-	def saveExePath(self):
-		try:
-			exePath = self.txtExePath.text()
-			home = expanduser("~")
-			homeConfigPath = home + "/sqlvc/sqlvc-config.xml"
-
-			root = ET.parse(homeConfigPath).getroot()
-
-			tool = root.find('difftool')
-
-			if tool == None:
-				tool = ET.SubElement(root, "difftool")
-
-			tool.text = str(exePath)
-
-
-			tree = ET.ElementTree(root)
-			tree.write(homeConfigPath)
-
-			success_message = "Successfully saved config file."
-			reply = QtWidgets.QMessageBox.question(self, "Success!", success_message,  QtWidgets.QMessageBox.Ok)
-		except Exception as e:
-			saveLog(e)
-			error_message = "Error saving config! Please see log file"
-			reply = QtWidgets.QMessageBox.question(self, "Error!", error_message,  QtWidgets.QMessageBox.Ok)
-
-class ConnectionWindow(QtWidgets.QMainWindow):
-	def __init__(self, parent=None):
-		super(ConnectionWindow,self).__init__()
-
-		#initialize window
-		self.layout = ConnectLayout(parent=self)
-		self.setWindowTitle("Open Connection")
-		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
-		self.setCentralWidget(self.layout)
-		self.resize(250, 130)
-		self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
-		#self.setGeometry(10, 10, 250, 130)
-		self.center()
-		self.openUserConfig()
-
-	def openUserConfig(self):
-		home = expanduser("~")
-		homeConfigPath = home + "/sqlvc/sqlvc-config.xml"
-
-		if os.path.exists(homeConfigPath):
-			print("read")
-		else:
-			saveConfigurations(homeConfigPath)
-
-	def center(self):
-		frameGm = self.frameGeometry()
-		screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
-		centerPoint = QtWidgets.QApplication.desktop().screenGeometry(screen).center()
-		frameGm.moveCenter(centerPoint)
-		self.move(frameGm.topLeft())
-
-class ConnectLayout(QtWidgets.QWidget):
-	def __init__(self, parent=None):
-		super(ConnectLayout, self).__init__()
-		# create and set layout to place widgets
-		grid_layout = QtWidgets.QGridLayout(self)
-
-		#self.text_box = QtWidgets.QTextEdit(self)
-		labelDatabase = QtWidgets.QLabel(self)
-		labelDatabase.setText("Database")
-		grid_layout.addWidget(labelDatabase, 0, 0, 1, 3)
-
-		self.cmbDbase = QtWidgets.QComboBox(self)       	
-		grid_layout.addWidget(self.cmbDbase, 1, 0, 1, 3)
-		self.cmbDbase.addItem("Microsoft SQL Server")
-
-		labelEdited = QtWidgets.QLabel(self)
-		labelEdited.setText("Server/Instance")
-		grid_layout.addWidget(labelEdited, 2, 0, 1, 3)
-
-		self.cmbServers = QtWidgets.QComboBox(self)       	
-		grid_layout.addWidget(self.cmbServers, 3, 0, 1, 3)
-		self.cmbServers.setEditable(True)
-		self.cmbServers.lineEdit().setMaxLength(100)
-
-		self.labelAuthType = QtWidgets.QLabel(self)
-		self.labelAuthType.setText("Authentication")
-		grid_layout.addWidget(self.labelAuthType, 4, 0, 1, 3)
-
-		self.cmbAuthType = QtWidgets.QComboBox(self)  
-		self.cmbAuthType.addItem("Windows Authentication")
-		self.cmbAuthType.addItem("SQL Authentication")     	
-		grid_layout.addWidget(self.cmbAuthType, 5, 0, 1, 3)
-		self.cmbAuthType.currentIndexChanged.connect(self.authChange)
-
-		labelUser = QtWidgets.QLabel(self)
-		labelUser.setText("UserName")
-		grid_layout.addWidget(labelUser, 6, 0, 1, 3)
-
-		self.txtUserName = QtWidgets.QLineEdit(self)
-		grid_layout.addWidget(self.txtUserName, 7, 0, 1, 3)
-		self.txtUserName.setEnabled(False)
-
-		labelPass = QtWidgets.QLabel(self)
-		labelPass.setText("Password")
-		grid_layout.addWidget(labelPass, 8, 0, 1, 3)
-
-		self.txtPassword = QtWidgets.QLineEdit(self)
-		self.txtPassword.setEchoMode(QtWidgets.QLineEdit.Password)
-		self.txtPassword.setEnabled(False)
-		grid_layout.addWidget(self.txtPassword, 9, 0, 1, 3)
-
-
-		btnOpen = QtWidgets.QPushButton('Open')
-		grid_layout.addWidget(btnOpen, 10, 1)
-		btnOpen.clicked.connect(lambda : OpenConnection(self))
-
-		self.btnCancel = QtWidgets.QPushButton('Cancel')
-		grid_layout.addWidget(self.btnCancel, 10, 2)
-		self.btnCancel.clicked.connect(parent.close)
-
-		self.setDisplayUser(False)
-
-	def authChange(self):
-		enable = None
-
-		if self.cmbAuthType.currentText() == "Windows Authentication":
-			enable = False
-		else:
-			enable = True
-
-		self.txtUserName.setEnabled(enable)
-		self.txtPassword.setEnabled(enable)
-		self.setDisplayUser(enable)
-
-	def setDisplayUser(self, display):
-		#domain = os.environ['userdnsdomain']
-		user = getpass.getuser()
-		domain = platform.node()
-
-		if not display:
-			self.txtUserName.setText(domain + "\\" + user)
-		else:
-			self.txtUserName.setText("")
+#window
+from comparewindow import *
+from settingswindow import *
+from connectwindow import *
 
 class MainWindow(QtWidgets.QMainWindow):
 	def __init__(self, parent=None):
@@ -284,7 +17,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 		#initialize window
 		self.layout = Layout(parent=self)
-		self.setWindowTitle("SQLGVC")
+		self.setWindowTitle("SQLVC")
 		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
 		self.setCentralWidget(self.layout)
 		self.resize(700, 600)
@@ -302,20 +35,25 @@ class MainWindow(QtWidgets.QMainWindow):
 		open_action = QtWidgets.QAction('&Open Connection', self)
 		file_menu.addAction(open_action)
 		open_action.triggered.connect(self.addConnection)
+		open_action.setShortcut(QtGui.QKeySequence("Ctrl+O"))
 
 		open_log = QtWidgets.QAction('Open &Logs', self)
 		file_menu.addAction(open_log)
 		open_log.triggered.connect(self.openLogFolder)
+		open_log.setShortcut(QtGui.QKeySequence("Ctrl+L"))
 
 		preference_action = QtWidgets.QAction('&Preferences', self)
 		edit_menu.addAction(preference_action)
 		edit_menu.triggered.connect(self.openPreference)
+		preference_action.setShortcut(QtGui.QKeySequence("Ctrl+P"))
 
 		close_action = QtWidgets.QAction('&Quit', self)
 		file_menu.addAction(close_action)
+		close_action.setShortcut(QtGui.QKeySequence("Ctrl+Q"))
 
 		about_action = QtWidgets.QAction('&About', self)
 		help_menu.addAction(about_action)
+		about_action.setShortcut(QtGui.QKeySequence("Ctrl+A"))
 
 		# use `connect` method to bind signals to desired behavior
 		close_action.triggered.connect(self.close_windows)
@@ -327,6 +65,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
 	def close_windows(self):
 		self.close()
+
+	def setSQLWindowTitle(self):
+		title = "SQLVC - " + globalvars.server + "[" + globalvars.username + "]"
+		self.setWindowTitle(title)
 
 
 	def addConnection(self):
@@ -520,13 +262,22 @@ class Layout(QtWidgets.QWidget):
 			compareVersion = menu.addAction(self.tr("Compare to other versions"))
 			compareVersion.triggered.connect(self.compareOtherVersion)
 
-			menu.addAction(self.tr("Compare to other commits"))
+			compareCommit = menu.addAction(self.tr("Compare to other commits"))
+			compareCommit.triggered.connect(self.compareOtherCommit)
+
 			menu.addAction(self.tr("Revert to previous state"))
 			menu.addAction(self.tr("Include/Exclude"))
 
 			menu.exec_(self.objListTab.viewport().mapToGlobal(position))
 
 	def compareOtherVersion(self):
+		globalvars.compareObj.layout.compareToOtherVersions()
+		globalvars.compareObj.setWindowFlags(globalvars.compareObj.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
+		compare.show()
+		#globalvars.compareObj.
+
+	def compareOtherCommit(self):
+		globalvars.compareObj.layout.compareToOtherCommits()
 		compare.show()
 
 	def compareToLatest(self):

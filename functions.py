@@ -46,6 +46,7 @@ def OpenConnection(connectWindow):
 
 		#if no errors exeecuting config...continue
 		if continueExec:
+			globalvars.MainWindow.parent().setSQLWindowTitle()
 			getUserObject()
 			getChangesets()
 
@@ -257,6 +258,13 @@ def readConnConfiguration(path, connWin = None):
 
 			cmbIndex = cmbIndex + 1
 
+	if connWin.layout.cmbServers.currentText() == "":
+		connWin.layout.cmbServers.setFocus()
+	elif connWin.layout.txtUserName.text() == "":
+		connWin.layout.txtUserName.setFocus()
+	elif connWin.layout.txtPassword.text() == "":
+		connWin.layout.txtPassword.setFocus()
+
 def getUserObject():
 
 	if globalvars.engine == "Microsoft SQL Server":
@@ -311,7 +319,7 @@ def generateObjectScript(user, database, objType, objName, rowId = None):
 			query = "exec getLatestScriptByUser '" + user + "','" + database + "','" + objType + "','" + objName + "'"
 		else:
 			query = "exec getLatestScriptByRowId '" + str(rowId) + "'"
-
+		print(query)
 
 		conn = pyodbc.connect(globalvars.connString)
 		cursor = conn.cursor()
@@ -321,6 +329,10 @@ def generateObjectScript(user, database, objType, objName, rowId = None):
 			#viewText.document().setPlainText(row[0]);
 			viewObj = row[0]
 
+	return viewObj
+
+def generateCommitScript(user, database, objType, objName, rowId = None):
+	viewObj = ""
 	return viewObj
 
 def generateVersionList(database, objType, objName):
@@ -337,7 +349,23 @@ def generateVersionList(database, objType, objName):
 
 	return viewObj
 
-def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, compareType):
+def generateCommitListPerItem(database, objType, objName):
+
+	viewObj = []
+
+	if globalvars.engine == "Microsoft SQL Server":
+		query = "exec getScriptByCommitPerItem '" + database + "','" + objType + "','" + objName + "'"
+
+		conn = pyodbc.connect(globalvars.connString)
+		cursor = conn.cursor()
+		cursor.execute(query)
+		viewObj = cursor.fetchall()
+
+
+	return viewObj
+
+
+def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, compareType, rowId1 = '', rowId2 = ''):
 	compare_directory = str(tempfile.gettempdir()) + "/"
 	obj1 = ""
 	obj2 = ""
@@ -356,6 +384,22 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 			# hash_md5.update(obj2.encode("utf-8"))
 			# hexdigest = hash_md5.hexdigest()
 			targetDB = db2
+
+		elif compareType == "compareversion": #compare your edits to other versions
+			name1 = compare_directory + objName1 + "_HISTORY("+str(rowId1)+").sql"
+			name2 = compare_directory + objName2 + "_LATEST_USERVERSION.sql"
+
+			obj1 = generateObjectScript('', '', '', '', rowId1) #latest version of the script
+			obj2 = generateObjectScript(user, db2, objType2, objName2) #latest version of the user
+
+			targetDB = db2
+
+		elif compareType == "comparecommit": #compare your edits to other commit
+			name1 = compare_directory + objName1 + "_HISTORY("+str(rowId1)+").sql"
+			name2 = compare_directory + objName2 + "_LATEST_USERVERSION.sql"
+
+			obj1 = generateCommitScript('', '', '', '', rowId1) #latest version of the script
+			obj2 = generateObjectScript(user, db2, objType2, objName2) #latest version of the user
 
 	c1 = open(name1, "w")
 	c1.write(obj1)
@@ -396,6 +440,10 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 
 			if name2 != "":
 				os.remove(name2)
+
+			if compareType == "compareversion":
+				globalvars.compareObj.show()
+				globalvars.compareObj.setWindowFlags(globalvars.compareObj.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
 
 	else:
 		apply_message = "No difftool found. Please define one in Edit > Preferences > Difftool"

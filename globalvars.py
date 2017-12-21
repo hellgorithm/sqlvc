@@ -9,6 +9,7 @@ connTest = None
 databaseEdits = {}
 objListTab = None
 sett = None
+compareObj = None
 masterPassword = "P@ssw0rd"
 
 #ENGINE MSSSQL
