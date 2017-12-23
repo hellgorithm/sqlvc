@@ -16,6 +16,10 @@ There are still features that are not yet implemented
 * Diffmerge
 * SQL Server Driver 13 (tested in Linux and Windows)
 
+### Build Dependencies 
+* Python2.7/3
+* PyQt5
+* Pyinstaller
 
 ### Feedback
 
