@@ -21,7 +21,7 @@ class treeModel():
         server.setText(0, globalvars.server.upper())
         server.setExpanded(True)
 
-        for row in globalvars.databaseEdits:
+        for row in dat:
             #set database
             rdatabase = str(row[1])
             if database != rdatabase:

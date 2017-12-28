@@ -11,6 +11,9 @@ objListTab = None
 sett = None
 compareObj = None
 masterPassword = "P@ssw0rd"
+openedCommitTab = []
+openedCommitTabText = []
+version = "1.0.0"
 
 #ENGINE MSSSQL
 DBTEST = "master"

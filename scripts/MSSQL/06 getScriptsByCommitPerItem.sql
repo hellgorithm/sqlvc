@@ -4,7 +4,7 @@ BEGIN
 
 	SET NOCOUNT ON;
 
-    select * from [dbo].[Commits_hdr] where CommitID in (
+    select *, @database 'database',@objType 'objectType',@objName 'objectName' from [dbo].[Commits_hdr] where CommitID in (
 		select CommitID from [dbo].[Commits_dtl] where 
 			DatabaseName=@database and ObjectType=@objType 
 			and SchemaName + '.' + ObjectName=@objName

@@ -4,6 +4,37 @@ import xml.etree.cElementTree as ET
 from functions import *
 from os.path import expanduser
 
+class AboutWindow(QtWidgets.QMainWindow):
+	def __init__(self, parent=None):
+		super(AboutWindow,self).__init__()
+
+		self.layout = AboutLayout(parent=self)
+		self.setWindowTitle("About SQLVC")
+		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
+		self.setCentralWidget(self.layout)
+		self.resize(250, 130)
+		# self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
+		self.center()
+		globalvars.about = self
+
+	def center(self):
+		frameGm = self.frameGeometry()
+		screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
+		centerPoint = QtWidgets.QApplication.desktop().screenGeometry(screen).center()
+		frameGm.moveCenter(centerPoint)
+		self.move(frameGm.topLeft())
+
+class AboutLayout(QtWidgets.QWidget):
+	def __init__(self, parent=None):
+		super(AboutLayout, self).__init__()
+		grid_layout = QtWidgets.QGridLayout(self)
+
+		labelDiffTool = QtWidgets.QLabel(self)
+		labelDiffTool.setText("SQLVC " + globalvars.version +  "\n\nSQLVC Cross platform version control for SQL server. For source code\n visit https://github.com/hellgorithm/sqlvc\n\nDeveloper : Hellgorithm")
+		labelDiffTool.setOpenExternalLinks(True)
+
+		grid_layout.addWidget(labelDiffTool, 0, 0, 1, 3)
+
 class SettingsWindow(QtWidgets.QMainWindow):
 	def __init__(self, parent=None):
 		super(SettingsWindow,self).__init__()

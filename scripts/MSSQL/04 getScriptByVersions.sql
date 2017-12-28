@@ -5,7 +5,7 @@ BEGIN
 	-- interfering with SELECT statements.
 	SET NOCOUNT ON;
 
-    select EventDDL, LoginName, DatabaseName,SchemaName,ObjectName, EventDate, RowID, EventType from [SQLVC].[dbo].[DDLEvents] where
+    select EventDDL, LoginName, DatabaseName,SchemaName,ObjectName, EventDate, RowID, ObjectType from [SQLVC].[dbo].[DDLEvents] where
 		DatabaseName=@database 
 		and ObjectType=@objType 
 		and SchemaName + '.' + ObjectName=@objName order by RowID desc

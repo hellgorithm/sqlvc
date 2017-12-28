@@ -54,9 +54,13 @@ class MainWindow(QtWidgets.QMainWindow):
 		about_action = QtWidgets.QAction('&About', self)
 		help_menu.addAction(about_action)
 		about_action.setShortcut(QtGui.QKeySequence("Ctrl+A"))
+		about_action.triggered.connect(self.openAbout)
 
 		# use `connect` method to bind signals to desired behavior
 		close_action.triggered.connect(self.close_windows)
+
+	def openAbout(self):
+		about.show()
 
 	def openPreference(self):
 		exePath = sett.layout.readExePath()
@@ -106,8 +110,9 @@ class Layout(QtWidgets.QWidget):
 		# create and set layout to place widgets
 
 		grid_layout = QtWidgets.QGridLayout(self)
+		splitter = QtWidgets.QSplitter(self)
 
-		fileParentTab = QtWidgets.QTabWidget()
+		self.fileParentTab = QtWidgets.QTabWidget()
 		self.contParentTab = QtWidgets.QTabWidget()
 		#self.contParentTab_layout = QtWidgets.QGridLayout(self)
 
@@ -127,10 +132,13 @@ class Layout(QtWidgets.QWidget):
 		self.lstCommits.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 		self.lstCommits.setRootIsDecorated(False)
 		self.lstCommits.setAlternatingRowColors(True)
+		#self.lstCommits.itemDoubleClicked.connect(self.showCommitDetails)
 
 		self.lstCommitsModel = self.createCommitModel(self)
 		
 		self.lstCommits.setModel(self.lstCommitsModel)
+		self.lstCommits.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+		self.lstCommits.customContextMenuRequested.connect(self.openCommitMenu)
 		#self.addCommit(self.lstCommitsModel, 'service@github.com','soggy', 'Your Github Donation','03/25/2017 02:05 PM')
 
 
@@ -161,11 +169,17 @@ class Layout(QtWidgets.QWidget):
 		self.lstEdited.setReadOnly(True)
 		self.lstEdited.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
 
-		fileParentTab.addTab(fileList, "Objects")
-		fileParentTab.addTab(changesetListTab, "Commits")
+		self.fileParentTab.addTab(fileList, "Objects")
+		self.fileParentTab.addTab(changesetListTab, "Commits")
+		self.fileParentTab.setTabsClosable(True)
+		self.fileParentTab.tabCloseRequested.connect(self.removeConflictTab)
+		#remove close button for other tabs
+		self.fileParentTab.tabBar().setTabButton(0, QtWidgets.QTabBar.RightSide,None)
+		self.fileParentTab.tabBar().setTabButton(1, QtWidgets.QTabBar.RightSide,None)
+
 
 		self.contParentTab.addTab(self.contentTab,"Details")
-		self.contParentTab.addTab(versionTab,"Versions")
+		self.contParentTab.addTab(versionTab,"Edit History")
 		#self.contParentTab.addTab(self.conflictTab, "Conflicts") #hidden
 		self.contParentTab.setTabsClosable(True)
 		self.contParentTab.tabCloseRequested.connect(self.contParentTab.removeTab)
@@ -179,7 +193,8 @@ class Layout(QtWidgets.QWidget):
 		self.conflictTab.layout = QtWidgets.QGridLayout(self)
 		versionTab.layout = QtWidgets.QGridLayout(self)
 
-		changesetListTab.layout.addWidget(self.lstCommits, 0,0,1,1)
+		changesetListTab.layout.addWidget(self.lstCommits, 1,0,1,1)
+
 		fileList.layout.addWidget(self.btnCommit,0,0,1,1)
 		fileList.layout.addWidget(self.commitMessage,1,0,1,1)
 		fileList.layout.addWidget(self.objListTab,2,0,1,1)
@@ -199,26 +214,25 @@ class Layout(QtWidgets.QWidget):
 		#trObjList = QtWidgets.QTreeView()
 
 		#end treeview
+		splitter.addWidget(self.contParentTab)
+		splitter.addWidget(self.fileParentTab)
 
-		grid_layout.addWidget(self.contParentTab, 1, 0, 1, 2)
-		grid_layout.addWidget(fileParentTab, 1, 2, 1, 2) #row, column, height, width
-		# self.scriptDetails = QtWidgets.QListWidget(self)
-		# tab_layout.addWidget(self.scriptDetails, 0, 2, 1, 2)
+		# grid_layout.addWidget(self.contParentTab, 1, 0, 1, 2)
+		# grid_layout.addWidget(self.fileParentTab, 1, 2, 1, 2) #row, column, height, width
+		grid_layout.addWidget(splitter)
 
-		# self.detailsTab = QtWidgets.QWidget()
-		# grid_layout.addTab(tab_layout, 1, 4, 1, 2)
-		#en tab
 
-		# self.save_button = QtWidgets.QPushButton('Save')
-		# self.clear_button = QtWidgets.QPushButton('Clear')
-		# self.open_button = QtWidgets.QPushButton('Open')
-		# self.quit_button = QtWidgets.QPushButton('Quit')
-
-		# grid_layout.addWidget(self.save_button, 2, 0)
-		# grid_layout.addWidget(self.clear_button, 2, 1)
-		# grid_layout.addWidget(self.open_button, 2, 2)
-		# grid_layout.addWidget(self.quit_button, 2, 3)
 		globalvars.MainWindow = self
+
+	def showCommitDetails(self):
+		print("hello")
+
+	def removeConflictTab(self, index):
+		self.fileParentTab.removeTab(index)
+		
+		tabArrIndex = (index - 2)
+		del globalvars.openedCommitTab[tabArrIndex]
+		del globalvars.openedCommitTabText[tabArrIndex]
 
 	#commit table creator
 	def createCommitModel(self,parent):
@@ -259,26 +273,156 @@ class Layout(QtWidgets.QWidget):
 			compareLatest = menu.addAction(self.tr("Compare to latest"))
 			compareLatest.triggered.connect(self.compareToLatest)
 
-			compareVersion = menu.addAction(self.tr("Compare to other versions"))
+			compareVersion = menu.addAction(self.tr("Compare to other edit history"))
 			compareVersion.triggered.connect(self.compareOtherVersion)
 
 			compareCommit = menu.addAction(self.tr("Compare to other commits"))
 			compareCommit.triggered.connect(self.compareOtherCommit)
 
-			menu.addAction(self.tr("Revert to previous state"))
-			menu.addAction(self.tr("Include/Exclude"))
+			removeObj = menu.addAction(self.tr("Delete to Workspace"))
+			removeObj.triggered.connect(self.removeObj)
+
+			inexclude = menu.addAction(self.tr("Include/Exclude"))
+			inexclude.triggered.connect(self.inexclude)
 
 			menu.exec_(self.objListTab.viewport().mapToGlobal(position))
+
+	def openCommitMenu(self, position):
+		indexes = self.lstCommits.selectedIndexes()
+		if len(indexes) > 0:
+			menu = QtWidgets.QMenu()
+			generate = menu.addAction(self.tr("View Commit Info"))
+			generate.triggered.connect(lambda:self.generateCommitObjectList(self.lstCommitsModel.data(indexes[0]), self.lstCommitsModel.data(indexes[2])))
+
+			menu.exec_(self.lstCommits.viewport().mapToGlobal(position))
+
+	def openCommitDetailsMenu(self, position):
+		indexes = self.commitList.selectedIndexes()
+		if len(indexes) == 0:
+			menu = QtWidgets.QMenu()
+			generate = menu.addAction(self.tr("Compare to other commit"))
+			generate.triggered.connect(self.compareToOtherCommit)
+			#generate.triggered.connect(lambda:self.generateCommitObjectList(self.lstCommitsModel.data(indexes[0]), self.lstCommitsModel.data(indexes[2])))
+
+			menu.exec_(self.commitList.viewport().mapToGlobal(position))
+
+	def compareToOtherCommit(self):
+		print("Comparing to other commit")
+		globalvars.compareObj.layout.compareToOtherCommits(self.commitList)
+		globalvars.commit1 = self.txtCommitID.text()
+		compare.show()
+		globalvars.compareMode = "comparecommit2"
+		# if self.commitList.selectedIndexes() == []:
+		# 	item = self.commitList.currentItem()
+		# 	itemText = item.text(0)
+
+		# 	dbObjType = item.parent()
+		# 	dbObjTypeText = dbObjType.text(0)
+
+		# 	database = dbObjType.parent()
+		# 	databaseText = database.text(0)
+
+		# 	objScript = generateCommitScript(None, databaseText, dbObjTypeText, itemText, self.commitid)
+
+		# 	self.versionList.clear() #clear items first
+		# 	self.lstEdited.document().setPlainText(objScript);
+
+
+	def generateCommitObjectList(self, commitid, commitMessage):
+		if commitid not in globalvars.openedCommitTabText:
+			commitInfo = QtWidgets.QWidget()
+			commitTitle = "Commit [" + commitid + "]"
+
+			self.commitid = commitid
+
+			self.fileParentTab.addTab(commitInfo, commitTitle)
+			commitInfo.layout = QtWidgets.QGridLayout(self)
+			commitInfo.setLayout(commitInfo.layout)
+
+			self.txtCommitID = QtWidgets.QLineEdit(self)
+			commitInfo.layout.addWidget(self.txtCommitID,0,0,1,1)
+			self.txtCommitID.setReadOnly(True)
+			self.txtCommitID.setText(commitid)
+
+			self.txtCommitMessage = QtWidgets.QPlainTextEdit(self)
+			commitInfo.layout.addWidget(self.txtCommitMessage,1,0,1,1)
+			self.txtCommitMessage.setFixedHeight(70)
+			self.txtCommitMessage.setReadOnly(True)
+			self.txtCommitMessage.document().setPlainText(commitMessage)
+
+			self.commitList = QtWidgets.QTreeWidget()
+			commitInfo.layout.addWidget(self.commitList,2,0,2,1)
+			self.commitList.setHeaderLabels([commitid])
+			self.commitList.itemDoubleClicked.connect(self.generateCommitScript)
+			self.commitList.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+			self.commitList.customContextMenuRequested.connect(self.openCommitDetailsMenu)
+
+			self.commitList.clear()
+			trViewObjects = treeModel()
+
+			dataBaseCommits = getCommitDetails(commitid)
+
+			trViewObjects.generateView(self.commitList, dataBaseCommits)
+
+			globalvars.openedCommitTabText.append(commitid)
+			globalvars.openedCommitTab.append(commitInfo)
+
+		objIndex = globalvars.openedCommitTabText.index(commitid)
+		self.fileParentTab.setCurrentIndex((2 + objIndex))
+
+	def generateCommitScript(self):
+		print("Viewing script info")
+		if self.commitList.selectedIndexes() == []:
+			item = self.commitList.currentItem()
+			itemText = item.text(0)
+
+			dbObjType = item.parent()
+			dbObjTypeText = dbObjType.text(0)
+
+			database = dbObjType.parent()
+			databaseText = database.text(0)
+
+			objScript = generateCommitScript(None, databaseText, dbObjTypeText, itemText, self.commitid)
+
+			self.versionList.clear() #clear items first
+			self.lstEdited.document().setPlainText(objScript);
+
+	def removeObj(self):
+		print("Remove item")
+		if self.objListTab.selectedIndexes() == []:
+			item = self.objListTab.currentItem()
+			# itemText = item.text(0)
+
+			# dbObjType = item.parent()
+			# dbObjTypeText = dbObjType.text(0)
+
+			# database = dbObjType.parent()
+			# databaseText = database.text(0)
+			rowId = item.data(QtCore.Qt.UserRole,0)
+
+			#removeItemToWorkspace(globalvars.username, databaseText, dbObjTypeText, itemText)
+			removeItemToWorkspace(rowId)
+
+
+	def inexclude(self):
+		print("Include/Exclude item")
+		if self.objListTab.selectedIndexes() == []:
+			item = self.objListTab.currentItem()
+			if item.checkState(0) == QtCore.Qt.Unchecked:
+				item.setCheckState(0,QtCore.Qt.Checked)
+			else:
+				item.setCheckState(0,QtCore.Qt.Unchecked)
 
 	def compareOtherVersion(self):
 		globalvars.compareObj.layout.compareToOtherVersions()
 		globalvars.compareObj.setWindowFlags(globalvars.compareObj.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
 		compare.show()
-		#globalvars.compareObj.
+		globalvars.compareMode = "compareversion"
 
 	def compareOtherCommit(self):
-		globalvars.compareObj.layout.compareToOtherCommits()
+		globalvars.compareObj.layout.compareToOtherCommits(self.objListTab)
 		compare.show()
+		globalvars.compareMode = "comparecommit"
 
 	def compareToLatest(self):
 		print("Comparing to latest version")
@@ -338,5 +482,7 @@ if __name__ == '__main__':
 	sett = SettingsWindow()
 
 	compare = CompareOther()
+
+	about = AboutWindow()
 	
 	sys.exit(app.exec_())
