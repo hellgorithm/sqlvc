@@ -49,7 +49,7 @@ class CompareLayout(QtWidgets.QWidget):
 			index = self.lstCompareObj.selectedIndexes()
 			item = self.lstCompareModel.data(index[0])
 			db = self.lstCompareModel.data(index[3])
-			objType = index[6]
+			objType = self.lstCompareModel.data(index[6])
 			objName = self.lstCompareModel.data(index[4]) + '.' + self.lstCompareModel.data(index[5])
 			
 			globalvars.compareObj.hide()

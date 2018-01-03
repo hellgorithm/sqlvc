@@ -10,6 +10,7 @@ from os.path import expanduser
 from comparewindow import *
 from settingswindow import *
 from connectwindow import *
+from queries import *
 
 class MainWindow(QtWidgets.QMainWindow):
 	def __init__(self, parent=None):
@@ -37,6 +38,12 @@ class MainWindow(QtWidgets.QMainWindow):
 		open_action.triggered.connect(self.addConnection)
 		open_action.setShortcut(QtGui.QKeySequence("Ctrl+O"))
 
+
+		refresh_action = QtWidgets.QAction('&Refresh', self)
+		file_menu.addAction(refresh_action)
+		refresh_action.triggered.connect(self.refreshConn)
+		refresh_action.setShortcut(QtGui.QKeySequence("Ctrl+R"))
+
 		open_log = QtWidgets.QAction('Open &Logs', self)
 		file_menu.addAction(open_log)
 		open_log.triggered.connect(self.openLogFolder)
@@ -58,6 +65,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
 		# use `connect` method to bind signals to desired behavior
 		close_action.triggered.connect(self.close_windows)
+		
+		#self.setStyleSheet("""background-color:#424242;color:#f4f4f4;""");
+	def refreshConn(self):
+		refreshConn()
 
 	def openAbout(self):
 		about.show()
@@ -132,8 +143,14 @@ class Layout(QtWidgets.QWidget):
 		self.lstCommits.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 		self.lstCommits.setRootIsDecorated(False)
 		self.lstCommits.setAlternatingRowColors(True)
-		#self.lstCommits.itemDoubleClicked.connect(self.showCommitDetails)
-
+		styleSheet = """
+QTreeView {
+    alternate-background-color: #000;
+    background: #424242;
+}
+"""
+		#self.lstCommits.setStyleSheet(styleSheet)
+		
 		self.lstCommitsModel = self.createCommitModel(self)
 		
 		self.lstCommits.setModel(self.lstCommitsModel)

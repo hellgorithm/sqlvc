@@ -14,6 +14,15 @@ import hashlib
 import uuid
 
 
+from queries import *
+
+
+def refreshConn():
+	print("refreshing data")
+	getUserObject()
+	getChangesets()
+
+
 def EventEmmitter(index):
 	# item = trViewObjects.model().index(0,0)
 	# strData = item.data(0).toPyObject()
@@ -107,30 +116,6 @@ def configureDB(connectWindow):
 					eventLogger.close()
 
 					cursor.execute(sql02)
-
-					eventLogger = open("./scripts/MSSQL/03 getLatestScriptByUser.sql", "r")
-					sql03 = eventLogger.read()
-					eventLogger.close()
-
-					cursor.execute(sql03)
-
-					eventLogger = open("./scripts/MSSQL/04 getScriptByVersions.sql", "r")
-					sql04 = eventLogger.read()
-					eventLogger.close()
-
-					cursor.execute(sql04)
-
-					eventLogger = open("./scripts/MSSQL/05 getLatestScriptByRowId.sql", "r")
-					sql05 = eventLogger.read()
-					eventLogger.close()
-
-					cursor.execute(sql05)
-
-					eventLogger = open("./scripts/MSSQL/06 getScriptsByCommitPerItem.sql", "r")
-					sql06 = eventLogger.read()
-					eventLogger.close()
-
-					cursor.execute(sql06)
 					conn.close()
 
 					globalvars.connString = connString
@@ -329,9 +314,9 @@ def generateObjectScript(user, database, objType, objName, rowId = None):
 
 	if globalvars.engine == "Microsoft SQL Server":
 		if rowId == None:
-			query = "exec getLatestScriptByUser '" + user + "','" + database + "','" + objType + "','" + objName + "'"
+			query = get_latest_script_by_user(user, database, objType, objName)
 		else:
-			query = "exec getLatestScriptByRowId '" + str(rowId) + "'"
+			query = get_latest_script_by_rowid(str(rowId))
 
 		conn = pyodbc.connect(globalvars.connString)
 		cursor = conn.cursor()
@@ -346,7 +331,7 @@ def generateCommitScript(user, database, objType, objName, commitId = ''):
 	viewObj = ""
 
 	if globalvars.engine == "Microsoft SQL Server":
-		query = "exec getLatestScriptByCommit '" + database + "','" + objType + "','" + objName + "','" + commitId + "'"
+		query = get_latest_script_by_commit(database, objType, objName, commitId)
 		#print(query)
 		conn = pyodbc.connect(globalvars.connString)
 		cursor = conn.cursor()
@@ -361,8 +346,7 @@ def generateVersionList(database, objType, objName):
 	viewObj = []
 
 	if globalvars.engine == "Microsoft SQL Server":
-		query = "exec getScriptByVersions '" + database + "','" + objType + "','" + objName + "'"
-
+		query = get_script_by_versions(database, objType, objName)
 		conn = pyodbc.connect(globalvars.connString)
 		cursor = conn.cursor()
 		cursor.execute(query)
@@ -375,7 +359,7 @@ def generateCommitListPerItem(database, objType, objName):
 	viewObj = []
 
 	if globalvars.engine == "Microsoft SQL Server":
-		query = "exec getScriptByCommitPerItem '" + database + "','" + objType + "','" + objName + "'"
+		query =get_script_by_commit_per_item(database,objType,objName)
 
 		conn = pyodbc.connect(globalvars.connString)
 		cursor = conn.cursor()
@@ -585,10 +569,7 @@ def CommitChanges(MainWindow):
 								commitID = commitID + "-" + str(i[0])
 
 
-							query2 = """insert into [SQLVC].[dbo].[Commits_dtl](CommitID, DatabaseName, SchemaName, ObjectName, LoginName, ObjectType, ObjectDDL)
-								select '""" + commitID + """',DatabaseName, SchemaName, ObjectName, LoginName, ObjectType,(select top 1 EventDDL from [dbo].[DDLEvents] 
-								where DatabaseName=ws.DatabaseName and SchemaName=ws.SchemaName and ObjectType=ws.ObjectType and ObjectName=ws.ObjectName 
-								order by RowID desc) from [SQLVC].[dbo].[UserWorkspace] ws where RowId in (""" + rowId + """);"""
+							query2 = save_commit_detail(commitID, rowId)
 
 
 							print("commiting items")
@@ -646,6 +627,7 @@ def removeItemToWorkspace(rowId):
 
 			message = "Successfully removed item."
 			reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Remove Item", message,  QtWidgets.QMessageBox.Ok)
+			getUserObject()
 
 	except Exception as e:
 		saveLog(e)

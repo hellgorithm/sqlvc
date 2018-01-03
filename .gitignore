@@ -1,3 +1,5 @@
 monitor-gui/client-config.xml
 *.pyc
 *.dat
+dist
+build
