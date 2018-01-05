@@ -3,6 +3,7 @@ from PyQt5 import QtWidgets, QtGui, QtCore
 import xml.etree.cElementTree as ET
 from functions import *
 from os.path import expanduser
+import traceback
 
 class AboutWindow(QtWidgets.QMainWindow):
 	def __init__(self, parent=None):
@@ -23,6 +24,10 @@ class AboutWindow(QtWidgets.QMainWindow):
 		centerPoint = QtWidgets.QApplication.desktop().screenGeometry(screen).center()
 		frameGm.moveCenter(centerPoint)
 		self.move(frameGm.topLeft())
+
+	def darkMode(self):
+		if globalvars.darkmode:
+			self.setStyleSheet("""background-color:#424242;color:#f4f4f4;""");
 
 class AboutLayout(QtWidgets.QWidget):
 	def __init__(self, parent=None):
@@ -54,6 +59,10 @@ class SettingsWindow(QtWidgets.QMainWindow):
 		centerPoint = QtWidgets.QApplication.desktop().screenGeometry(screen).center()
 		frameGm.moveCenter(centerPoint)
 		self.move(frameGm.topLeft())
+
+	def darkMode(self):
+		if globalvars.darkmode:
+			self.setStyleSheet("""background-color:#424242;color:#f4f4f4;""");
 
 class SettingsLayout(QtWidgets.QWidget):
 	def __init__(self, parent=None):
@@ -131,6 +140,6 @@ class SettingsLayout(QtWidgets.QWidget):
 			success_message = "Successfully saved config file."
 			reply = QtWidgets.QMessageBox.question(self, "Success!", success_message,  QtWidgets.QMessageBox.Ok)
 		except Exception as e:
-			saveLog(e)
+			saveLog(traceback.format_exc())
 			error_message = "Error saving config! Please see log file"
 			reply = QtWidgets.QMessageBox.question(self, "Error!", error_message,  QtWidgets.QMessageBox.Ok)

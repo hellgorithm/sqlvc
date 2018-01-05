@@ -1,4 +1,4 @@
-engine = None
+engine = "Microsoft SQL Server"
 server = None
 database = None
 username = None
@@ -13,7 +13,14 @@ compareObj = None
 masterPassword = "P@ssw0rd"
 openedCommitTab = []
 openedCommitTabText = []
-version = "1.0.0"
+version = "alpha 1"
+darkmode = False
+connectionMode = 'connectserver'
+serverTypeMerge = None
+serverMerge = None
+usernameMerge = None
+passwordMerge = None
+authTypeMerge = None
 
 #ENGINE MSSSQL
 DBTEST = "master"

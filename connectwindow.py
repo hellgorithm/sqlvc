@@ -3,6 +3,7 @@ import sys, os, getpass, platform
 from PyQt5 import QtWidgets, QtGui, QtCore
 from functions import *
 from os.path import expanduser
+import traceback
 
 class ConnectionWindow(QtWidgets.QMainWindow):
 	def __init__(self, parent=None):
@@ -10,6 +11,7 @@ class ConnectionWindow(QtWidgets.QMainWindow):
 
 		#initialize window
 		self.layout = ConnectLayout(parent=self)
+		self.setWindowModality(QtCore.Qt.ApplicationModal)
 		self.setWindowTitle("Open Connection")
 		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
 		self.setCentralWidget(self.layout)
@@ -34,6 +36,10 @@ class ConnectionWindow(QtWidgets.QMainWindow):
 		centerPoint = QtWidgets.QApplication.desktop().screenGeometry(screen).center()
 		frameGm.moveCenter(centerPoint)
 		self.move(frameGm.topLeft())
+
+	def darkMode(self):
+		if globalvars.darkmode:
+			self.setStyleSheet("""background-color:#424242;color:#f4f4f4;""");
 
 class ConnectLayout(QtWidgets.QWidget):
 	def __init__(self, parent=None):
@@ -88,16 +94,23 @@ class ConnectLayout(QtWidgets.QWidget):
 		self.txtPassword.returnPressed.connect(lambda : OpenConnection(self))
 		grid_layout.addWidget(self.txtPassword, 9, 0, 1, 3)
 
-
-		btnOpen = QtWidgets.QPushButton('Open')
-		grid_layout.addWidget(btnOpen, 10, 1)
-		btnOpen.clicked.connect(lambda : OpenConnection(self))
+		self.btnOpen = QtWidgets.QPushButton('Open')
+		grid_layout.addWidget(self.btnOpen, 10, 1)
+		self.btnOpen.clicked.connect(lambda : OpenConnection(self))
 
 		self.btnCancel = QtWidgets.QPushButton('Cancel')
 		grid_layout.addWidget(self.btnCancel, 10, 2)
 		self.btnCancel.clicked.connect(parent.close)
 
 		self.setDisplayUser(False)
+
+	def setButtonFunction(self):
+		if globalvars.connectionMode == 'connectserver':
+			self.btnOpen.disconnect()
+			self.btnOpen.clicked.connect(lambda : OpenConnection(self))
+		elif globalvars.connectionMode == 'mergeserver':
+			self.btnOpen.disconnect()
+			self.btnOpen.clicked.connect(lambda : OpenConnectionMerge(self))
 
 	def authChange(self):
 		enable = None
@@ -120,3 +133,20 @@ class ConnectLayout(QtWidgets.QWidget):
 			self.txtUserName.setText(domain + "\\" + user)
 		else:
 			self.txtUserName.setText("")
+
+
+
+		
+		# user = getpass.getuser()
+
+		# if platform.system() == "Windows":
+		# 	domain = os.environ['userdomain']
+		# elif platform.system() == "Darwin":
+		# 	domain = platform.node()
+		# else:
+		# 	domain = platform.node()
+
+		# if not display:
+		# 	self.txtUserName.setText(domain + "\\" + user)
+		# else:
+		# 	self.txtUserName.setText("")

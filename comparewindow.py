@@ -22,6 +22,17 @@ class CompareOther(QtWidgets.QMainWindow): #compare selection for other version 
 		frameGm.moveCenter(centerPoint)
 		self.move(frameGm.topLeft())
 
+	def darkMode(self):
+		if globalvars.darkmode:
+			self.setStyleSheet("""background-color:#424242;color:#f4f4f4;""");
+			styleSheet = """
+				QTreeView {
+				    alternate-background-color: #605e5e;
+				    background: #424242;
+				}
+				"""
+			self.layout.lstCompareObj.setStyleSheet(styleSheet)
+
 class CompareLayout(QtWidgets.QWidget):
 
 	ROW_ID, DATE, USER, OBJ_DATABASE, OBJ_SCHEMA, OBJ_NAME, OBJ_TYPE  = range(7) 

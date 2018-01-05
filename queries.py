@@ -19,13 +19,13 @@ def get_script_by_versions(database, objectType, objectName):
 		and SchemaName + '.' + ObjectName='"""+objectName+"""' order by RowID desc"""
 
 def get_script_by_commit_per_item(database, objectType, objectName):
-	return """select *, '"""+str(database)+"""' 'database','"""+str(objectType)+"""' 'objectType','"""+str(objectName)+"""' 'objectName' from [dbo].[Commits_hdr] where CommitID in (
+	return """select *, '"""+str(database)+"""' 'database','"""+str(objectType)+"""' 'objectType','"""+str(objectName)+"""' 'objectName' from [dbo].[Commits_hdr] where CommitID + '-' + convert(varchar(100),RowID) in (
 					select CommitID from [dbo].[Commits_dtl] where 
 						DatabaseName='"""+str(database)+"""' and ObjectType='"""+str(objectType)+"""' 
 						and SchemaName + '.' + ObjectName='"""+str(objectName)+"""'
 				) order by RowID desc"""
 
-def save_commit_detail(commitID, rowid):
+def save_commit_detail(commitID, rowId):
 	return """insert into [SQLVC].[dbo].[Commits_dtl](CommitID, DatabaseName, SchemaName, ObjectName, LoginName, ObjectType, ObjectDDL)
 								select '""" + commitID + """',DatabaseName, SchemaName, ObjectName, LoginName, ObjectType,(select top 1 EventDDL from [dbo].[DDLEvents] 
 								where DatabaseName=ws.DatabaseName and SchemaName=ws.SchemaName and ObjectType=ws.ObjectType and ObjectName=ws.ObjectName 

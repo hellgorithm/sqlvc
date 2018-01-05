@@ -8,10 +8,12 @@ from treeModel import treeModel
 import tempfile
 import subprocess, threading
 import hashlib
+import decimal
 # from Crypto.Cipher import AES
 # from Crypto.Hash import SHA256
 # import base64
 import uuid
+import traceback
 
 
 from queries import *
@@ -29,6 +31,42 @@ def EventEmmitter(index):
 	# print('' + str(strData))
 
     item = index.selectedIndexes()[0]
+
+# def OpenConnectionMerge(connectWindow):
+# 	try:
+# 		serverType = connectWindow.cmbDbase.currentText()
+# 		server = connectWindow.cmbServers.currentText()
+# 		username = connectWindow.txtUserName.text()
+# 		password = connectWindow.txtPassword.text()
+# 		authType = connectWindow.cmbAuthType.currentText()
+
+# 		stat = testConn(serverType, server, authType, username, password)
+# 		if stat:
+# 			configPath = os.path.expanduser("~") + "/sqlvc/sqlvc-config.xml"
+# 			saveConfigurations(configPath, connectWindow)
+
+# 			#configure DB
+# 			continueExec = configureDB(connectWindow)
+
+# 			#if no errors exeecuting config...continue
+# 			if continueExec:
+# 				print("Successfully configured database")
+# 				globalvars.serverTypeMerge = connectWindow.cmbDbase.currentText()
+# 				globalvars.serverMerge = connectWindow.cmbServers.currentText()
+# 				globalvars.usernameMerge = connectWindow.txtUserName.text()
+# 				globalvars.passwordMerge = connectWindow.txtPassword.text()
+# 				globalvars.authTypeMerge = connectWindow.cmbAuthType.currentText()
+
+
+# 			connectWindow.btnCancel.click()
+
+# 		else:
+# 			error_message = "Could not connect to database server!"
+# 			QtWidgets.QMessageBox.about(connectWindow, "Error", error_message)
+
+# 	except Exception as e:
+# 		saveLog(traceback.format_exc())
+# 		print("Connection error occured for merge")
 
 def OpenConnection(connectWindow):
 	#save connection for later use
@@ -66,7 +104,7 @@ def OpenConnection(connectWindow):
 			QtWidgets.QMessageBox.about(connectWindow, "Error", error_message)
 
 	except Exception as e:
-		saveLog(e)
+		saveLog(traceback.format_exc())
 		print("Connection error occured")
 		error_message = "Connection error occured. Please see log file for details"
 		reply = QtWidgets.QMessageBox.question(connectWindow, "Connection Error", error_message,  QtWidgets.QMessageBox.Ok)
@@ -91,7 +129,7 @@ def configureDB(connectWindow):
 			globalvars.connString = connString
 			return True
 	except Exception as e:
-		saveLog(e)
+		saveLog(traceback.format_exc())
 		print("Database does not exists, create one...")
 		error_message = "SQLVC scripts not found. Click OK to install."
 		reply = QtWidgets.QMessageBox.question(connectWindow, "Install Scripts", error_message,  QtWidgets.QMessageBox.Ok)
@@ -101,9 +139,12 @@ def configureDB(connectWindow):
 			try:
 				if globalvars.engine == "Microsoft SQL Server":
 					#create db
+					print("Connectiong to "+ globalvars.connTest)
+					query = "CREATE DATABASE " + globalvars.DBGIT
+					
 					conn = pyodbc.connect(globalvars.connTest, autocommit=True)
 					cursor = conn.cursor()
-					cursor.execute("CREATE DATABASE " + globalvars.DBGIT)
+					cursor.execute(query)
 
 					eventLogger = open("./scripts/MSSQL/01 DDLEvents.sql", "r")
 					sql01 = eventLogger.read()
@@ -125,7 +166,7 @@ def configureDB(connectWindow):
 					print("Not yet supported")
 
 			except Exception as e:
-				saveLog(e)
+				saveLog(traceback.format_exc())
 				print("Error creating repository! Please see log file")
 				error_message = "Error creating repository! Please see log file"
 				reply = QtWidgets.QMessageBox.question(connectWindow, "Install Scripts", error_message,  QtWidgets.QMessageBox.Ok)
@@ -176,7 +217,7 @@ def testConn(serverType, server, authType, username = None, password = None):
 			globalvars.connTest = connString
 			return True
 		except Exception as e:
-			saveLog(e)
+			saveLog(traceback.format_exc())
 			print("Connection error!")
 			return False
 
@@ -268,7 +309,7 @@ def getUserObject():
 	if globalvars.engine == "Microsoft SQL Server":
 		conn = pyodbc.connect(globalvars.connString)
 		cursor = conn.cursor()
-		cursor.execute("select * from [SQLVC].[dbo].[UserWorkspace] where LoginName='" + globalvars.username + "'  order by DatabaseName, ObjectType, ObjectName")
+		cursor.execute("select [RowID],[DatabaseName],[SchemaName],[ObjectName],[LoginName],[ObjectType] from [SQLVC].[dbo].[UserWorkspace] where LoginName='" + globalvars.username + "' and SchemaName is not null order by DatabaseName, ObjectType, ObjectName")
 		#cursor.execute("select * from [SQLVC].[dbo].[UserWorkspace]")
 		rows = cursor.fetchall()
 
@@ -341,6 +382,34 @@ def generateCommitScript(user, database, objType, objName, commitId = ''):
 			viewObj = row[0]
 	return viewObj
 
+def generateRemoteScript(server, auth, serverUser, serverPass, database, objType, objName):
+	
+	try:
+		viewObj = ""
+		
+		if globalvars.engine == "Microsoft SQL Server":
+
+			if auth == "Windows Authentication":
+				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + server + ";DATABASE=SQLVC;Trusted_Connection=yes;"
+			else:
+				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + server + ";DATABASE=SQLVC;UID=" + serverUser + ";PWD=" + serverPass
+
+			query = get_latest_script_by_user('', database, objType, objName)
+			conn = pyodbc.connect(connString)
+			cursor = conn.cursor()
+			cursor.execute(query)
+			rows = cursor.fetchall()
+			for row in rows:
+				viewObj = row[0]
+		return viewObj
+
+	except Exception as e:
+		saveLog(traceback.format_exc())
+		error_message = "Error fetching remote script. Please see log file"
+		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Apply Merged", error_message,  QtWidgets.QMessageBox.Ok)
+		return ""
+
+
 def generateVersionList(database, objType, objName):
 
 	viewObj = []
@@ -370,7 +439,7 @@ def generateCommitListPerItem(database, objType, objName):
 	return viewObj
 
 
-def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, compareType, rowId1 = '', rowId2 = ''):
+def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, compareType, rowId1 = '', rowId2 = '', server1 = '', server2 = '', serverUser1 = '', serverUser2 = '', serverPass1 = '', serverPass2 = '', auth1 = '', auth2 = ''):
 	compare_directory = str(tempfile.gettempdir()) + "/"
 	obj1 = ""
 	obj2 = ""
@@ -414,7 +483,15 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 			obj1 = generateCommitScript(user, db1, objType1, objName1, rowId1) #latest version of the script
 			obj2 = generateCommitScript(user, db2, objType2, objName2, rowId2) #latest version of the script
 
+			targetDB = db2
 
+		elif compareType == "compareToServer":
+			name1 = compare_directory + objName1 + "_COMMIT("+str(rowId1)+").sql"
+			name2 = compare_directory + objName2 + "_SERVER("+str(rowId2)+").sql"
+
+			obj1 = generateCommitScript(user, db1, objType1, objName1, rowId1)
+			obj2 = generateRemoteScript(server2, auth2, serverUser2, serverPass2, db2, objType2, objName2)
+			
 			targetDB = db2
 	c1 = open(name1, "w")
 	c1.write(obj1)
@@ -454,11 +531,14 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 			#check there are changes in script file
 			if hexdigest != new_hash_md5.hexdigest():
 
-				apply_message = "Apply merged files? You cannot push your code unless you owned the lates version."
+				apply_message = "Apply merged files? You cannot push your code unless you owned the latest version."
 				reply  = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", apply_message,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
 
 				if reply == QtWidgets.QMessageBox.Ok:
-					checkForApply(toApply,targetDB)
+					if compareType == 'compareToServer':
+						checkForApply(toApply,targetDB)
+					else:
+						checkForApply(toApply, targetDB, auth2, server2, serverUser2, serverPass2)
 
 				if name1 != "":
 					os.remove(name1)
@@ -475,24 +555,40 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 		reply  = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", apply_message,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
 
 
-def checkForApply(mergedFile, targetDB):
+def checkForApply(mergedFile, targetDB,targetAuth = '', targetServer = '', targetUser = '', targetPass = ''):
 	try:
 		if globalvars.engine == "Microsoft SQL Server":
-			if globalvars.authType == "Windows Authentication":
-				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + globalvars.server + ";DATABASE=" + targetDB + ";Trusted_Connection=yes;"
+
+			if targetServer == '':
+				server =  globalvars.server
 			else:
-				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + globalvars.server + ";DATABASE=" + targetDB + ";UID=" + globalvars.username + ";PWD=" + globalvars.password
+				server = targetServer
+
+			if targetUser == '':
+				user = globalvars.username
+			else:
+				user = targetUser
+
+			if targetPass == '':
+				password = globalvars.password
+			else:
+				password = targetPass
+
+			if targetAuth == "Windows Authentication":
+				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + server + ";DATABASE=" + targetDB + ";Trusted_Connection=yes;"
+			else:
+				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + server + ";DATABASE=" + targetDB + ";UID=" + user + ";PWD=" + password
 
 			conn = pyodbc.connect(connString, autocommit=True)
 			cursor = conn.cursor()
 			cursor.execute(mergedFile)
 
 	except Exception as e:
-		saveLog(e)
+		saveLog(traceback.format_exc())
 		error_message = "Error applying merged file. Please see log file"
 		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Apply Merged", error_message,  QtWidgets.QMessageBox.Ok)
 
-def CommitChanges(MainWindow):
+def CommitChanges(MainWindow, flag=''):
 	try:
 		treeView = MainWindow.objListTab
 		# treeView.setSelectionMode(QtWidgets.QAbstractItemView.ContiguousSelection)
@@ -519,7 +615,11 @@ def CommitChanges(MainWindow):
 								then 'ok' else 'conflict' end,*
 								from [dbo].[UserWorkspace] ws where RowId in (""" + rowId + """)"""
 					
-					conn = pyodbc.connect(globalvars.connString)
+					if flag == 'mergeToTarget':
+						conn = pyodbc.connect(MainWindow.connString)
+					else:
+						conn = pyodbc.connect(globalvars.connString)
+
 					cursor = conn.cursor()
 					rows = cursor.execute(query)
 
@@ -559,8 +659,11 @@ def CommitChanges(MainWindow):
 
 							query1_1 = "select @@IDENTITY"
 
+							if flag == 'mergeToTarget':
+								conn = pyodbc.connect(MainWindow.connString, autocommit=True)
+							else:
+								conn = pyodbc.connect(globalvars.connString, autocommit=True)
 
-							conn = pyodbc.connect(globalvars.connString, autocommit=True)
 							cursor = conn.cursor()
 							cursor.execute(query1)
 							ident = cursor.execute(query1_1)
@@ -591,7 +694,7 @@ def CommitChanges(MainWindow):
 						getChangesets()
 
 	except Exception as e:
-		saveLog(e)
+		saveLog(traceback.format_exc())
 		error_message = "Error commiting file. Please see log file for error."
 		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", error_message,  QtWidgets.QMessageBox.Ok)
 
@@ -630,7 +733,7 @@ def removeItemToWorkspace(rowId):
 			getUserObject()
 
 	except Exception as e:
-		saveLog(e)
+		saveLog(traceback.format_exc())
 		error_message = "Error removing item. Please see log file for details."
 		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Remove Item", error_message,  QtWidgets.QMessageBox.Ok)
 
@@ -680,13 +783,20 @@ def select_item(item, mode = 0):
 	return selected_item
 
 def getCommitDetails(commitid):
-	if globalvars.engine == "Microsoft SQL Server":
-		sql = "select RowID, DatabaseName, SchemaName, ObjectName, LoginName, ObjectType from [SQLVC].[dbo].[Commits_dtl] where CommitID='" + commitid + "' order by DatabaseName, ObjectType, ObjectName"
-		conn = pyodbc.connect(globalvars.connString)
-		cursor = conn.cursor()
-		data = cursor.execute(sql)
-		return data
-		
+	try:
+		if globalvars.engine == "Microsoft SQL Server":
+			query = "select RowID, DatabaseName, SchemaName, ObjectName, LoginName, ObjectType from [SQLVC].[dbo].[Commits_dtl] where CommitID='" + commitid + "' order by DatabaseName, ObjectType, ObjectName"
+			conn = pyodbc.connect(globalvars.connString, autocommit=True)
+			cursor = conn.cursor()
+			data = cursor.execute(query)
+			return data
+
+
+	except Exception as e:
+		saveLog(traceback.format_exc())
+		error_message = "Error getting commit details. Please see log file for details."
+		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Remove Item", error_message,  QtWidgets.QMessageBox.Ok)
+			
 
 
 

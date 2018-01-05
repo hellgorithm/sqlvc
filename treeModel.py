@@ -7,7 +7,7 @@ class treeModel():
         print("Setting up models")
 
     def generateView(self, tw, dat):
-
+        
         database = ""
         objectType = ""
         obj = ""
@@ -20,7 +20,7 @@ class treeModel():
         server = QtWidgets.QTreeWidgetItem(tw)
         server.setText(0, globalvars.server.upper())
         server.setExpanded(True)
-
+        
         for row in dat:
             #set database
             rdatabase = str(row[1])

@@ -5,6 +5,7 @@ import xml.etree.cElementTree as ET
 from treeModel import treeModel
 from functions import *
 from os.path import expanduser
+import decimal
 
 #window
 from comparewindow import *
@@ -12,13 +13,15 @@ from settingswindow import *
 from connectwindow import *
 from queries import *
 
+import traceback
+
 class MainWindow(QtWidgets.QMainWindow):
 	def __init__(self, parent=None):
 		super(MainWindow,self).__init__()
 
 		#initialize window
 		self.layout = Layout(parent=self)
-		self.setWindowTitle("SQLVC")
+		self.setWindowTitle("SQLVC " + globalvars.version)
 		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
 		self.setCentralWidget(self.layout)
 		self.resize(700, 600)
@@ -51,8 +54,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
 		preference_action = QtWidgets.QAction('&Preferences', self)
 		edit_menu.addAction(preference_action)
-		edit_menu.triggered.connect(self.openPreference)
+		preference_action.triggered.connect(self.openPreference)
 		preference_action.setShortcut(QtGui.QKeySequence("Ctrl+P"))
+
+		# dark_action = QtWidgets.QAction('&Dark Mode', self)
+		# edit_menu.addAction(dark_action)
+		# dark_action.triggered.connect(lambda:self.setDarkMode(self))
+		# dark_action.setShortcut(QtGui.QKeySequence("Ctrl+D"))
 
 		close_action = QtWidgets.QAction('&Quit', self)
 		file_menu.addAction(close_action)
@@ -60,29 +68,43 @@ class MainWindow(QtWidgets.QMainWindow):
 
 		about_action = QtWidgets.QAction('&About', self)
 		help_menu.addAction(about_action)
-		about_action.setShortcut(QtGui.QKeySequence("Ctrl+A"))
+		about_action.setShortcut(QtGui.QKeySequence("Ctrl+Shift+A"))
 		about_action.triggered.connect(self.openAbout)
 
 		# use `connect` method to bind signals to desired behavior
 		close_action.triggered.connect(self.close_windows)
 		
 		#self.setStyleSheet("""background-color:#424242;color:#f4f4f4;""");
+
+	def setDarkMode(self, mainWindow):
+		styleSheet = """
+			QTreeView {
+			    alternate-background-color: #605e5e;
+			    background: #424242;
+			}
+			"""
+		mainWindow.setStyleSheet("""background-color:#424242;color:#f4f4f4;""");
+		mainWindow.layout.lstCommits.setStyleSheet(styleSheet)
+		globalvars.darkmode = True
+
 	def refreshConn(self):
 		refreshConn()
 
 	def openAbout(self):
 		about.show()
+		about.darkMode()
 
 	def openPreference(self):
 		exePath = sett.layout.readExePath()
 		sett.layout.txtExePath.setText(exePath)
 		sett.show()
+		sett.darkMode()
 
 	def close_windows(self):
 		self.close()
 
 	def setSQLWindowTitle(self):
-		title = "SQLVC - " + globalvars.server + "[" + globalvars.username + "]"
+		title = "SQLVC "+ globalvars.version+" - " + globalvars.server + "[" + globalvars.username + "]"
 		self.setWindowTitle(title)
 
 
@@ -91,6 +113,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		homeConfigPath = home + "/sqlvc/sqlvc-config.xml"
 		readConnConfiguration(homeConfigPath, conn)
 		conn.show()
+		conn.darkMode()
 
 
 	def center(self):
@@ -143,13 +166,7 @@ class Layout(QtWidgets.QWidget):
 		self.lstCommits.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 		self.lstCommits.setRootIsDecorated(False)
 		self.lstCommits.setAlternatingRowColors(True)
-		styleSheet = """
-QTreeView {
-    alternate-background-color: #000;
-    background: #424242;
-}
-"""
-		#self.lstCommits.setStyleSheet(styleSheet)
+
 		
 		self.lstCommitsModel = self.createCommitModel(self)
 		
@@ -241,6 +258,14 @@ QTreeView {
 
 		globalvars.MainWindow = self
 
+		self.serverTypeMerge = None
+		self.serverMerge = None
+		self.usernameMerge = None
+		self.passwordMerge = None
+		self.authTypeMerge = None
+		self.connected = False
+		self.connString = None
+
 	def showCommitDetails(self):
 		print("hello")
 
@@ -309,9 +334,120 @@ QTreeView {
 		if len(indexes) > 0:
 			menu = QtWidgets.QMenu()
 			generate = menu.addAction(self.tr("View Commit Info"))
-			generate.triggered.connect(lambda:self.generateCommitObjectList(self.lstCommitsModel.data(indexes[0]), self.lstCommitsModel.data(indexes[2])))
+			generate.triggered.connect(lambda:self.generateCommitObjectList(self.lstCommitsModel.data(indexes[0]), self.lstCommitsModel.data(indexes[2]), 'viewcommit'))
+
+			# mergeCommit = menu.addAction(self.tr("Merge to other server"))
+			# mergeCommit.triggered.connect(lambda:self.generateMergeCommitObjectList(self.lstCommitsModel.data(indexes[0]), self.lstCommitsModel.data(indexes[2])))
 
 			menu.exec_(self.lstCommits.viewport().mapToGlobal(position))
+
+
+	def generateMergeCommitObjectList(self):
+		# globalvars.connectionMode = 'mergeserver'
+		# #conn.layout.setButtonFunction(self)
+
+		if self.connected:
+			self.txtCommitID.show()
+			self.btnCommitMerge.hide()
+
+			self.btnOpenServer.setText("Apply to...")
+			self.btnOpenServer.clicked.connect(self.generateMergeCommitObjectList)
+
+			conn.layout.btnOpen.disconnect()
+			conn.layout.btnOpen.clicked.connect(lambda: OpenConnection(conn.layout))
+
+			self.commitList.customContextMenuRequested.disconnect()
+			self.commitList.customContextMenuRequested.connect(self.openCommitDetailsMenu)
+			self.txtCommitMessage.setReadOnly(True)
+
+			self.connected = False
+		else:
+
+			conn.layout.btnOpen.disconnect()
+			conn.layout.btnOpen.clicked.connect(self.OpenConnectionMerge)
+			conn.show()
+
+			self.commitList.customContextMenuRequested.disconnect()
+			self.commitList.customContextMenuRequested.connect(self.openMergeCommitDetailsMenu)
+
+		# #gnerate list
+		# self.generateCommitObjectList(commitid, commitMessage, 'mergecommit')
+
+
+
+	def OpenConnectionMerge(self):
+
+		try:
+			serverType = conn.layout.cmbDbase.currentText()
+			server = conn.layout.cmbServers.currentText()
+			username = conn.layout.txtUserName.text()
+			password = conn.layout.txtPassword.text()
+			authType = conn.layout.cmbAuthType.currentText()
+
+			stat = testConn(serverType, server, authType, username, password)
+			if stat:
+				configPath = os.path.expanduser("~") + "/sqlvc/sqlvc-config.xml"
+				saveConfigurations(configPath, conn.layout)
+
+				globalvars.engine = serverType
+				self.serverTypeMerge = conn.layout.cmbDbase.currentText()
+				self.serverMerge = conn.layout.cmbServers.currentText()
+				self.usernameMerge = conn.layout.txtUserName.text()
+				self.passwordMerge = conn.layout.txtPassword.text()
+				self.authTypeMerge = conn.layout.cmbAuthType.currentText()
+				self.connected = True
+
+				if self.authTypeMerge == "Windows Authentication":
+					self.connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + self.serverMerge + ";DATABASE=SQLVC;Trusted_Connection=yes;"
+				else:
+					self.connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + self.serverMerge + ";DATABASE=SQLVC;UID=" + self.usernameMerge + ";PWD=" + self.passwordMerge
+
+				#set button text
+				self.btnOpenServer.setText("Disconnect")
+				#setup ui
+				self.txtCommitID.hide()
+				self.btnCommitMerge.show()
+				self.txtCommitMessage.setReadOnly(False)
+
+				print("Successfully connected to target database")
+
+
+				conn.layout.btnCancel.click()
+
+			else:
+				error_message = "Could not connect to database server!"
+				QtWidgets.QMessageBox.about(conn.layout, "Error", error_message)
+
+			#return to default in case user wants to connect to other server
+			globalvars.connectionMode == 'connectserver' 
+			conn.layout.btnOpen.disconnect()
+			conn.layout.btnOpen.clicked.connect(lambda: OpenConnection(conn.layout))
+
+		except Exception as e:
+			saveLog(traceback.format_exc())
+			print("Connection error occured for merge")
+
+	def openMergeCommitDetailsMenu(self, position):
+		indexes = self.commitList.selectedIndexes()
+		if len(indexes) == 0:
+			menu = QtWidgets.QMenu()
+			generate = menu.addAction(self.tr("Merge to " + self.serverMerge))
+			generate.triggered.connect(self.mergeToTarget)
+			menu.exec_(self.commitList.viewport().mapToGlobal(position))
+
+	def mergeToTarget(self):
+		if self.commitList.selectedIndexes() == []:
+			item = self.commitList.currentItem()
+			itemText = item.text(0)
+
+			dbObjType = item.parent()
+			dbObjTypeText = dbObjType.text(0)
+
+			database = dbObjType.parent()
+			databaseText = database.text(0)
+			
+			downloadToCompare(globalvars.username, databaseText, dbObjTypeText, itemText, databaseText, dbObjTypeText, itemText, 'compareToServer', self.txtCommitID.text(), '', '', self.serverMerge, '', self.usernameMerge, '', self.passwordMerge, '', self.authTypeMerge)
+
 
 	def openCommitDetailsMenu(self, position):
 		indexes = self.commitList.selectedIndexes()
@@ -327,27 +463,17 @@ QTreeView {
 		print("Comparing to other commit")
 		globalvars.compareObj.layout.compareToOtherCommits(self.commitList)
 		globalvars.commit1 = self.txtCommitID.text()
+
 		compare.show()
+		compare.darkMode()
+
 		globalvars.compareMode = "comparecommit2"
-		# if self.commitList.selectedIndexes() == []:
-		# 	item = self.commitList.currentItem()
-		# 	itemText = item.text(0)
-
-		# 	dbObjType = item.parent()
-		# 	dbObjTypeText = dbObjType.text(0)
-
-		# 	database = dbObjType.parent()
-		# 	databaseText = database.text(0)
-
-		# 	objScript = generateCommitScript(None, databaseText, dbObjTypeText, itemText, self.commitid)
-
-		# 	self.versionList.clear() #clear items first
-		# 	self.lstEdited.document().setPlainText(objScript);
 
 
-	def generateCommitObjectList(self, commitid, commitMessage):
+	def generateCommitObjectList(self, commitid, commitMessage, mode):
 		if commitid not in globalvars.openedCommitTabText:
 			commitInfo = QtWidgets.QWidget()
+
 			commitTitle = "Commit [" + commitid + "]"
 
 			self.commitid = commitid
@@ -357,28 +483,40 @@ QTreeView {
 			commitInfo.setLayout(commitInfo.layout)
 
 			self.txtCommitID = QtWidgets.QLineEdit(self)
-			commitInfo.layout.addWidget(self.txtCommitID,0,0,1,1)
+			commitInfo.layout.addWidget(self.txtCommitID,0,1,1,1)
 			self.txtCommitID.setReadOnly(True)
 			self.txtCommitID.setText(commitid)
 
 			self.txtCommitMessage = QtWidgets.QPlainTextEdit(self)
-			commitInfo.layout.addWidget(self.txtCommitMessage,1,0,1,1)
+			commitInfo.layout.addWidget(self.txtCommitMessage,1,0,1,3)
 			self.txtCommitMessage.setFixedHeight(70)
 			self.txtCommitMessage.setReadOnly(True)
 			self.txtCommitMessage.document().setPlainText(commitMessage)
 
+			self.btnOpenServer = QtWidgets.QPushButton("Apply to...")
+			commitInfo.layout.addWidget(self.btnOpenServer,0,0,1,1)
+			self.btnOpenServer.clicked.connect(self.generateMergeCommitObjectList)
+			self.btnOpenServer.setMaximumWidth(110)
+
+			self.btnCommitMerge = QtWidgets.QPushButton("Commit")
+			commitInfo.layout.addWidget(self.btnCommitMerge,0,1,1,1)
+			self.btnCommitMerge.clicked.connect(lambda: CommitChanges(self, 'mergeToTarget'))
+			self.btnCommitMerge.setMaximumWidth(100)
+			self.btnCommitMerge.hide()
+			#self.btnOpenServer.clicked.connect(lambda: CommitChanges(self))
+
 			self.commitList = QtWidgets.QTreeWidget()
-			commitInfo.layout.addWidget(self.commitList,2,0,2,1)
+			commitInfo.layout.addWidget(self.commitList,2,0,3,3)
 			self.commitList.setHeaderLabels([commitid])
 			self.commitList.itemDoubleClicked.connect(self.generateCommitScript)
 			self.commitList.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 			self.commitList.customContextMenuRequested.connect(self.openCommitDetailsMenu)
 
 			self.commitList.clear()
-			trViewObjects = treeModel()
 
 			dataBaseCommits = getCommitDetails(commitid)
-
+			
+			trViewObjects = treeModel()
 			trViewObjects.generateView(self.commitList, dataBaseCommits)
 
 			globalvars.openedCommitTabText.append(commitid)
@@ -433,12 +571,16 @@ QTreeView {
 	def compareOtherVersion(self):
 		globalvars.compareObj.layout.compareToOtherVersions()
 		globalvars.compareObj.setWindowFlags(globalvars.compareObj.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
+
 		compare.show()
+		compare.darkMode()
+
 		globalvars.compareMode = "compareversion"
 
 	def compareOtherCommit(self):
 		globalvars.compareObj.layout.compareToOtherCommits(self.objListTab)
 		compare.show()
+		compare.darkMode()
 		globalvars.compareMode = "comparecommit"
 
 	def compareToLatest(self):
