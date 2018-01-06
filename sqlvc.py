@@ -109,6 +109,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 	def addConnection(self):
+		conn.layout.cmbServers.clear()
 		home = expanduser("~")
 		homeConfigPath = home + "/sqlvc/sqlvc-config.xml"
 		readConnConfiguration(homeConfigPath, conn)
