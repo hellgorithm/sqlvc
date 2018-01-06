@@ -500,7 +500,7 @@ class Layout(QtWidgets.QWidget):
 
 			self.btnCommitMerge = QtWidgets.QPushButton("Commit")
 			commitInfo.layout.addWidget(self.btnCommitMerge,0,1,1,1)
-			self.btnCommitMerge.clicked.connect(lambda: CommitChanges(self, 'mergeToTarget'))
+			self.btnCommitMerge.clicked.connect(lambda: commitToOtherServer(self))
 			self.btnCommitMerge.setMaximumWidth(100)
 			self.btnCommitMerge.hide()
 			#self.btnOpenServer.clicked.connect(lambda: CommitChanges(self))

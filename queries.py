@@ -3,6 +3,11 @@ def get_latest_script_by_user(user, database, objectType, ObjectName):
 							and DatabaseName='""" + str(database) + """' and ObjectType='""" + str(objectType) + """' 
 							and SchemaName + '.' + ObjectName='""" + str(ObjectName) + """' order by RowID desc"""
 
+def get_workspace_script_by_user(user, database, objectType, ObjectName):
+	return """SELECT top 1 RowID from [SQLVC].[dbo].[UserWorkspace] where (LoginName='""" + str(user) + """' or '""" + str(user) + """'='')
+							and DatabaseName='""" + str(database) + """' and ObjectType='""" + str(objectType) + """' 
+							and SchemaName + '.' + ObjectName='""" + str(ObjectName) + """' order by RowID desc"""
+
 def get_latest_script_by_rowid(rowid):
 	return """SELECT top 1 EventDDL from [SQLVC].[dbo].[DDLEvents] where RowID='""" + str(rowid) + """'"""
 
