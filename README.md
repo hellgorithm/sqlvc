@@ -8,6 +8,9 @@ Cross platform version control for SQL server.
 * Track DDL changes
 * Compare versions via external difftool (Diffmerge is currently supported)
 * Apply merged changes in database
+* Commit database changes
+* Apply commit to other server as long as the target server is SQLVC enabled
+* Commit the applied changes in other server
 
 
 There are still features that are not yet implemented
@@ -27,6 +30,7 @@ https://github.com/hellgorithm/sqlvc
 
 ### Binary 
 [Windows 64bit](https://drive.google.com/file/d/1MHrevM5t0ykooH-nuFFatrUXUdPHE2xs/view?usp=sharing)
+
 [Linux 64bit](https://drive.google.com/file/d/1v9mAweUob7g0UJs9cWEoSh7g1F7wnNgx/view?usp=sharing)
 
 
