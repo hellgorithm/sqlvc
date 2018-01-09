@@ -13,8 +13,9 @@ class AboutWindow(QtWidgets.QMainWindow):
 		self.setWindowTitle("About SQLVC")
 		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
 		self.setCentralWidget(self.layout)
-		self.resize(250, 130)
-		# self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
+		self.resize(500, 130)
+		self.setFixedSize(self.size())
+		self.setWindowFlags(QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowMinimizeButtonHint)
 		self.center()
 		globalvars.about = self
 

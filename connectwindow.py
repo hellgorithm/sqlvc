@@ -127,7 +127,14 @@ class ConnectLayout(QtWidgets.QWidget):
 	def setDisplayUser(self, display):
 		#domain = os.environ['userdnsdomain']
 		user = getpass.getuser()
-		domain = platform.node()
+
+		if platform.system() == "Windows":
+			domain = os.environ['userdomain']
+		elif platform.system() == "Darwin":
+			domain = platform.node()
+		else:
+			domain = platform.node()
+		
 
 		if not display:
 			self.txtUserName.setText(domain + "\\" + user)

@@ -3,6 +3,9 @@ def get_latest_script_by_user(user, database, objectType, ObjectName):
 							and DatabaseName='""" + str(database) + """' and ObjectType='""" + str(objectType) + """' 
 							and SchemaName + '.' + ObjectName='""" + str(ObjectName) + """' order by RowID desc"""
 
+def get_latest_script(objectType, objectName):
+	return """select text, type from sysobjects o join syscomments c on c.id = o.id where o.name = '"""+objectName+"""' and o.type= '"""+str(objectType)+"""'"""
+
 def get_workspace_script_by_user(user, database, objectType, ObjectName):
 	return """SELECT top 1 RowID from [SQLVC].[dbo].[UserWorkspace] where (LoginName='""" + str(user) + """' or '""" + str(user) + """'='')
 							and DatabaseName='""" + str(database) + """' and ObjectType='""" + str(objectType) + """' 
@@ -16,6 +19,8 @@ def get_latest_script_by_commit(database, objectType, objectName, commitid):
 	return """SELECT ObjectDDL from [SQLVC].[dbo].[Commits_dtl] where CommitID='""" + str(commitid) + """' and DatabaseName='""" + str(database) + """' and ObjectType='""" + str(objectType) + """' and (SchemaName + '.' + ObjectName)='""" + str(objectName) + """'"""
 
 
+def get_scripts_by_commit(commitid):
+	return """SELECT ObjectName, ObjectDDL, ObjectType from [SQLVC].[dbo].[Commits_dtl] where CommitID='""" + str(commitid) + """'"""
 
 def get_script_by_versions(database, objectType, objectName):
 	return """select EventDDL, LoginName, DatabaseName,SchemaName,ObjectName, EventDate, RowID, ObjectType from [SQLVC].[dbo].[DDLEvents] where

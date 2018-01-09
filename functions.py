@@ -390,11 +390,15 @@ def generateRemoteScript(server, auth, serverUser, serverPass, database, objType
 		if globalvars.engine == "Microsoft SQL Server":
 
 			if auth == "Windows Authentication":
-				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + server + ";DATABASE=SQLVC;Trusted_Connection=yes;"
+				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + server + ";DATABASE=" + database + ";Trusted_Connection=yes;"
 			else:
-				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + server + ";DATABASE=SQLVC;UID=" + serverUser + ";PWD=" + serverPass
+				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + server + ";DATABASE=" + database + ";UID=" + serverUser + ";PWD=" + serverPass
 
-			query = get_latest_script_by_user('', database, objType, objName)
+			#query = get_latest_script_by_user('', database, objType, objName)
+			otype = objType[0:1]
+			oname = objName.split(".")[1]
+
+			query = get_latest_script(otype, oname)
 			conn = pyodbc.connect(connString)
 			cursor = conn.cursor()
 			cursor.execute(query)
@@ -487,7 +491,7 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 
 		elif compareType == "compareToServer":
 			name1 = compare_directory + objName1 + "_COMMIT("+str(rowId1)+").sql"
-			name2 = compare_directory + objName2 + "_SERVER("+str(rowId2)+").sql"
+			name2 = compare_directory + objName2 + "_SERVER("+str(server2.replace("\\","-"))+").sql"
 
 			obj1 = generateCommitScript(user, db1, objType1, objName1, rowId1)
 			obj2 = generateRemoteScript(server2, auth2, serverUser2, serverPass2, db2, objType2, objName2)
@@ -535,6 +539,7 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 				reply  = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", apply_message,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
 
 				if reply == QtWidgets.QMessageBox.Ok:
+					print(toApply)
 					if compareType == 'compareToServer':
 						checkForApply(toApply, targetDB, auth2, server2, serverUser2, serverPass2)
 					else:
@@ -578,10 +583,13 @@ def checkForApply(mergedFile, targetDB,targetAuth = '', targetServer = '', targe
 				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + server + ";DATABASE=" + targetDB + ";Trusted_Connection=yes;"
 			else:
 				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + server + ";DATABASE=" + targetDB + ";UID=" + user + ";PWD=" + password
-			print(targetUser)
+			
 			conn = pyodbc.connect(connString, autocommit=True)
 			cursor = conn.cursor()
-			cursor.execute(mergedFile)
+			cursor.execute(mergedFile.decode('UTF-8'))
+
+			message = "Successfully applied script"
+			reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Apply Merged", message,  QtWidgets.QMessageBox.Ok)
 
 	except Exception as e:
 		saveLog(traceback.format_exc())
@@ -589,99 +597,105 @@ def checkForApply(mergedFile, targetDB,targetAuth = '', targetServer = '', targe
 		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Apply Merged", error_message,  QtWidgets.QMessageBox.Ok)
 
 def commitToOtherServer(commitPanel):
-	selected_items, missing_item_names = select_remote_item(commitPanel)
-	
-	if len(selected_items) == 0:
-		commit_message = "No item selected to commit."
-		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok)
-	else:
-		commit_message = "You are about to commit changes in database. Continue?"
-		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Cancel)
-		conflicts = []
-		globalvars.MainWindow.conflictList.clear()
+	try:
+		selected_items, missing_item_names = select_remote_item(commitPanel)
+		
+		if len(selected_items) == 0:
+			commit_message = "No item selected to commit."
+			reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok)
+		else:
+			commit_message = "You are about to commit changes in database. Continue?"
+			reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Cancel)
+			conflicts = []
+			globalvars.MainWindow.conflictList.clear()
 
-		if reply == QtWidgets.QMessageBox.Ok:
+			if reply == QtWidgets.QMessageBox.Ok:
 
-			if globalvars.engine == "Microsoft SQL Server":
-				rowId = ",".join(selected_items)
-				query = """select case when (select top 1 LoginName from [dbo].[DDLEvents] 
-							where DatabaseName=ws.DatabaseName and SchemaName=ws.SchemaName and ObjectType=ws.ObjectType and ObjectName=ws.ObjectName 
-							order by RowID desc) = ws.LoginName 
-							then 'ok' else 'conflict' end,*
-							from [dbo].[UserWorkspace] ws where RowId in (""" + rowId + """)"""
-				
-				conn = pyodbc.connect(commitPanel.connString)
-				cursor = conn.cursor()
-				rows = cursor.execute(query)
+				if globalvars.engine == "Microsoft SQL Server":
+					rowId = ",".join(selected_items)
+					query = """select case when (select top 1 LoginName from [dbo].[DDLEvents] 
+								where DatabaseName=ws.DatabaseName and SchemaName=ws.SchemaName and ObjectType=ws.ObjectType and ObjectName=ws.ObjectName 
+								order by RowID desc) = ws.LoginName 
+								then 'ok' else 'conflict' end,*
+								from [dbo].[UserWorkspace] ws where RowId in (""" + rowId + """)"""
+					
+					conn = pyodbc.connect(commitPanel.connString)
+					cursor = conn.cursor()
+					rows = cursor.execute(query)
 
-				for row in rows:
-					if row[0] == 'conflict':
-						conflicts.append(row)
+					for row in rows:
+						if row[0] == 'conflict':
+							conflicts.append(row)
 
-				if len(conflicts) > 0 or len(missing_item_names) > 0 : #conflict detected
-					commit_message = "Conflicting items detected. Kindly review."
-					reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok)
-					globalvars.MainWindow.showConflictTab()
-
-					for conflict in conflicts:
-						citem =  QtWidgets.QListWidgetItem(conflict[4] + " latest version is not owned by you")
-						globalvars.MainWindow.conflictList.addItem(citem)
-
-					for missing in missing_item_names:
-						citem =  QtWidgets.QListWidgetItem(missing + " is not yet applied")
-						globalvars.MainWindow.conflictList.addItem(citem)
-
-				else:
-					#check if commit message is empty
-					text = str(commitPanel.txtCommitMessage.toPlainText())
-					if text.strip()  == "":
-						commit_message = "Empty commit message"
+					if len(conflicts) > 0 or len(missing_item_names) > 0 : #conflict detected
+						commit_message = "Conflicting items detected. Kindly review."
 						reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok)
-						globalvars.MainWindow.commitMessage.setFocus()
+						globalvars.MainWindow.showConflictTab()
+
+						for conflict in conflicts:
+							citem =  QtWidgets.QListWidgetItem(conflict[4] + " latest version is not owned by you")
+							globalvars.MainWindow.conflictList.addItem(citem)
+
+						for missing in missing_item_names:
+							citem =  QtWidgets.QListWidgetItem(missing + " is not yet applied")
+							globalvars.MainWindow.conflictList.addItem(citem)
+
 					else:
-						commitID = ""
+						#check if commit message is empty
+						text = str(commitPanel.txtCommitMessage.toPlainText())
+						if text.strip()  == "":
+							commit_message = "Empty commit message"
+							reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok)
+							globalvars.MainWindow.commitMessage.setFocus()
+						else:
+							commitID = ""
 
-						if globalvars.engine == "Microsoft SQL Server":
+							if globalvars.engine == "Microsoft SQL Server":
 
-							commitID = commitPanel.serverMerge.replace("\\","-")
+								commitID = commitPanel.serverMerge.replace("\\","-")
 
-							rowId = ",".join(selected_items)
+								rowId = ",".join(selected_items)
 
-							query1 = """insert into [SQLVC].[dbo].[Commits_hdr](CommitID, LoginName, CommitMessage, ChangesetDate)
-											values('""" + commitID + """','""" + commitPanel.usernameMerge + """','""" + text + """',GETDATE())"""
+								query1 = """insert into [SQLVC].[dbo].[Commits_hdr](CommitID, LoginName, CommitMessage, ChangesetDate)
+												values('""" + commitID + """','""" + commitPanel.usernameMerge + """','""" + text + """',GETDATE())"""
 
-							query1_1 = "select @@IDENTITY"
+								query1_1 = "select @@IDENTITY"
 
-							conn = pyodbc.connect(commitPanel.connString, autocommit=True)
+								conn = pyodbc.connect(commitPanel.connString, autocommit=True)
 
-							cursor = conn.cursor()
-							cursor.execute(query1)
-							ident = cursor.execute(query1_1)
+								cursor = conn.cursor()
+								cursor.execute(query1)
+								ident = cursor.execute(query1_1)
 
-							for i in ident:
-								commitID = commitID + "-" + str(i[0])
-
-
-							query2 = save_commit_detail(commitID, rowId)
-							print(query2)
-
-							print("commiting items")
-							cursor.execute(query2)
-
-							query_delete = """delete from [SQLVC].[dbo].[UserWorkspace] where RowId in (""" + rowId + """);"""
-							print(query_delete)
-							print("deleting commited item in workspace")
-							cursor.execute(query_delete)
-
-							conn.close()
+								for i in ident:
+									commitID = commitID + "-" + str(i[0])
 
 
-						commit_message = "Changes has been commited. Commit ID " + commitID + " has been created."
-						reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok)
-						globalvars.MainWindow.commitMessage.document().setPlainText("")
-						#remove items
-						getUserObject()
-						getChangesets()
+								query2 = save_commit_detail(commitID, rowId)
+								print(query2)
+
+								print("commiting items")
+								cursor.execute(query2)
+
+								query_delete = """delete from [SQLVC].[dbo].[UserWorkspace] where RowId in (""" + rowId + """);"""
+								print(query_delete)
+								print("deleting commited item in workspace")
+								cursor.execute(query_delete)
+
+								conn.close()
+
+
+							commit_message = "Changes has been commited. Commit ID " + commitID + " has been created."
+							reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", commit_message,  QtWidgets.QMessageBox.Ok)
+							globalvars.MainWindow.commitMessage.document().setPlainText("")
+							#remove items
+							getUserObject()
+							getChangesets()
+
+	except Exception as e:
+		saveLog(traceback.format_exc())
+		error_message = "Error commiting file to remote server. Please see log file for error."
+		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", error_message,  QtWidgets.QMessageBox.Ok)
 
 def CommitChanges(MainWindow, flag=''):
 	try:

@@ -349,6 +349,8 @@ class Layout(QtWidgets.QWidget):
 
 		if self.connected:
 			self.txtCommitID.show()
+			self.btnPatch.show()
+
 			self.btnCommitMerge.hide()
 
 			self.btnOpenServer.setText("Apply to...")
@@ -407,6 +409,8 @@ class Layout(QtWidgets.QWidget):
 				self.btnOpenServer.setText("Disconnect")
 				#setup ui
 				self.txtCommitID.hide()
+				self.btnPatch.hide()
+
 				self.btnCommitMerge.show()
 				self.txtCommitMessage.setReadOnly(False)
 
@@ -432,7 +436,13 @@ class Layout(QtWidgets.QWidget):
 		indexes = self.commitList.selectedIndexes()
 		if len(indexes) == 0:
 			menu = QtWidgets.QMenu()
-			generate = menu.addAction(self.tr("Merge to " + self.serverMerge))
+
+			if self.serverMerge == None:
+				server = "remote server"
+			else:
+				server = self.serverMerge
+
+			generate = menu.addAction(self.tr("Merge to " + server))
 			generate.triggered.connect(self.mergeToTarget)
 			menu.exec_(self.commitList.viewport().mapToGlobal(position))
 
@@ -484,7 +494,7 @@ class Layout(QtWidgets.QWidget):
 			commitInfo.setLayout(commitInfo.layout)
 
 			self.txtCommitID = QtWidgets.QLineEdit(self)
-			commitInfo.layout.addWidget(self.txtCommitID,0,1,1,1)
+			commitInfo.layout.addWidget(self.txtCommitID,0,2,1,1)
 			self.txtCommitID.setReadOnly(True)
 			self.txtCommitID.setText(commitid)
 
@@ -504,6 +514,11 @@ class Layout(QtWidgets.QWidget):
 			self.btnCommitMerge.clicked.connect(lambda: commitToOtherServer(self))
 			self.btnCommitMerge.setMaximumWidth(100)
 			self.btnCommitMerge.hide()
+
+			self.btnPatch = QtWidgets.QPushButton("Create Patch")
+			commitInfo.layout.addWidget(self.btnPatch,0,1,1,1)
+			self.btnPatch.clicked.connect(self.createPatch)
+			self.btnPatch.setMaximumWidth(100)
 			#self.btnOpenServer.clicked.connect(lambda: CommitChanges(self))
 
 			self.commitList = QtWidgets.QTreeWidget()
@@ -542,6 +557,37 @@ class Layout(QtWidgets.QWidget):
 
 			self.versionList.clear() #clear items first
 			self.lstEdited.document().setPlainText(objScript);
+
+	def createPatch(self):
+		print("Selecting folder for patch")
+		try:
+			folder = str(QtWidgets.QFileDialog.getExistingDirectory(self, "Select Directory"))
+
+			if folder != "":
+				query = get_scripts_by_commit(self.txtCommitID.text())
+				conn = pyodbc.connect(globalvars.connString, autocommit=True)
+				cursor = conn.cursor()
+				files = cursor.execute(query)
+
+				for file in files:
+					subfolder = str(folder) + "/" + str(file[2]) + "/"
+
+					if not os.path.isdir(subfolder):
+						os.makedirs(subfolder)
+
+					log_obj  = open(subfolder + str(file[0]) + ".txt", "w")
+					log_obj.write(str(file[1]))
+					log_obj.close()
+
+
+				error_message = "Patch file has been successfully created"
+				QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", error_message,  QtWidgets.QMessageBox.Ok)
+
+		except Exception as e:
+			saveLog(traceback.format_exc())
+			print("Error creating Patch file! Please see log file")
+			error_message = "Error creating patch file! Please see log file"
+			QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", error_message,  QtWidgets.QMessageBox.Ok)
 
 	def removeObj(self):
 		print("Remove item")
