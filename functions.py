@@ -21,8 +21,9 @@ from queries import *
 
 def refreshConn():
 	print("refreshing data")
-	getUserObject()
-	getChangesets()
+	if globalvars.server != None:
+		getUserObject()
+		getChangesets()
 
 
 def EventEmmitter(index):
@@ -693,7 +694,7 @@ def commitToOtherServer(commitPanel):
 								cursor.execute(query2)
 
 								query_delete = """delete from [SQLVC].[dbo].[UserWorkspace] where RowId in (""" + rowId + """);"""
-								
+
 								print("deleting commited item in workspace")
 								cursor.execute(query_delete)
 
