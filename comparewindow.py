@@ -1,5 +1,6 @@
 import globalvars
 from PyQt5 import QtWidgets, QtGui, QtCore
+import traceback
 from functions import *
 
 class CompareOther(QtWidgets.QMainWindow): #compare selection for other version and changeset
@@ -190,3 +191,141 @@ class CompareLayout(QtWidgets.QWidget):
 			for commit in reversed(commitList):
 				cid = commit[1] + '-' + str(commit[0])
 				self.addCommit(self.lstCompareModel, str(commit[0]), cid, commit[2], commit[4], str(commit[3]), databaseText, dbObjTypeText, itemText)
+
+class CompileHistory(QtWidgets.QMainWindow):
+	def __init__(self, parent=None):
+		super(CompileHistory,self).__init__()
+
+		self.layout = CompileLayout(parent=self)
+		self.setWindowTitle("Compile Table History")
+		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
+		self.setCentralWidget(self.layout)
+		self.resize(700, 500)
+		#self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowStaysOnTopHint)
+		self.center()
+		globalvars.compileHistory = self
+
+	def center(self):
+		frameGm = self.frameGeometry()
+		screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
+		centerPoint = QtWidgets.QApplication.desktop().screenGeometry(screen).center()
+		frameGm.moveCenter(centerPoint)
+		self.move(frameGm.topLeft())
+
+class CompileLayout(QtWidgets.QWidget):
+	HISTORY_DESC = 0
+	COMPILE_ID = ""
+	DATABASE = ""
+	OBJTYPE = ""
+	DBO = ""
+	OBJNAME = ""
+
+	def __init__(self, parent=None):
+		super(CompileLayout, self).__init__()
+		grid_layout = QtWidgets.QGridLayout(self)
+
+		self.lstCompileObj = QtWidgets.QTreeView(self)
+		self.lstCompileObj.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+		self.lstCompileObj.setRootIsDecorated(False)
+		self.lstCompileObj.setAlternatingRowColors(True)
+
+		self.compileDocPreview = QtWidgets.QPlainTextEdit(self)
+
+		self.btnApply = QtWidgets.QPushButton("Apply")
+		self.btnApply.clicked.connect(self.applyCompiledData)
+
+		self.btnClose = QtWidgets.QPushButton("Close")
+		self.btnClose.clicked.connect(self.hideMe)
+
+
+		grid_layout.addWidget(self.lstCompileObj, 1, 0, 1, 3)
+		grid_layout.addWidget(self.compileDocPreview, 1, 4, 1, 3)
+		grid_layout.addWidget(self.btnApply, 2, 5, 1, 1)
+		grid_layout.addWidget(self.btnClose, 2, 6, 1, 1)
+
+		self.lstCompileObjModel = self.createCompileModel(self)
+		self.lstCompileObjModel.itemChanged.connect(self.on_item_changed)
+
+
+
+		self.lstCompileObj.setModel(self.lstCompileObjModel)
+		#self.lstCompileObj.clicked.connect(self.checkUncheck)
+
+	def hideMe(self):
+		globalvars.compileHistory.hide()
+
+	def setEditData(self, versions):
+		self.lstCompileObjModel.removeRows(0, self.lstCompileObjModel.rowCount())
+
+		for version in versions:
+			desc = version[2] + '.' + version[3] + '.' + version[4] + ' modified last ' + str(version[5]) + ' by ' + version[1]
+			self.addCompileData(self.lstCompileObjModel, version[6], desc)
+			self.DATABASE = version[2]
+			self.OBJTYPE = version[7]
+			self.DBO = version[3]
+			self.OBJNAME = version[4]
+
+	def on_item_changed(self, item):
+		i = 0
+		checked = 0
+		arrRowID = []
+		compiled_dat = ""
+
+		while self.lstCompileObjModel.item(i):
+			if self.lstCompileObjModel.item(i).checkState() == QtCore.Qt.Checked:
+				arrRowID.append(str(self.lstCompileObjModel.item(i).data(QtCore.Qt.UserRole)))
+				checked += 1
+			i += 1
+
+		if checked > 0:
+			self.COMPILE_ID = ",".join(arrRowID)
+
+			compile_dataset = getCompiledScripts(self.COMPILE_ID)
+
+			for com in compile_dataset:
+				compiled_dat = compiled_dat + com[0] + "\n\n"
+
+		self.compileDocPreview.document().setPlainText(compiled_dat)
+
+	def createCompileModel(self, parent):
+		model = QtGui.QStandardItemModel(0, 1, parent)
+		model.setHeaderData(self.HISTORY_DESC, QtCore.Qt.Horizontal, "Edit History")
+
+		return model
+
+	def addCompileData(self, model, hId, historyDesc):
+		item = QtGui.QStandardItem(historyDesc)
+		# check = QtCore.Qt.Checked
+		# item.setCheckState(check)
+		item.setCheckable(True)
+		item.setData(hId, QtCore.Qt.UserRole)
+		model.appendRow(item)
+
+	def clean(self):
+		self.compileDocPreview.document().setPlainText("")
+
+
+	def applyCompiledData(self):
+		try:
+			eventDDL = self.compileDocPreview.toPlainText()
+			if globalvars.engine == "Microsoft SQL Server":
+				ddl = eventDDL.replace("'", "''")
+				query = saveCompiledScript(ddl, self.DATABASE, self.DBO, self.OBJNAME, self.OBJTYPE)
+				
+				conn = pyodbc.connect(globalvars.connString, autocommit=True)
+				cursor = conn.cursor()
+				commits = cursor.execute(query)
+			
+			message = "Compiled script for commit successfully created"
+			reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Compile Scripts", message,  QtWidgets.QMessageBox.Ok)
+
+			self.clean()
+			globalvars.compileHistory.hide()
+
+		except Exception as e:
+			saveLog(traceback.format_exc())
+			error_message = "Error compiling scripts. Please see log file for details."
+			reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Compile Scripts", error_message,  QtWidgets.QMessageBox.Ok)
+
+
+

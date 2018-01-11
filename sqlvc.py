@@ -307,28 +307,48 @@ class Layout(QtWidgets.QWidget):
 	def openMenu(self, position):
 
 		indexes = self.objListTab.selectedIndexes()
+		
+		item = self.objListTab.currentItem()
 
-		if indexes == []:
-			menu = QtWidgets.QMenu()
-			generate = menu.addAction(self.tr("View Object/Info"))
-			generate.triggered.connect(self.generateObjectScript)
+		if item != None:
+			itemText = item.text(0)
 
-			compareLatest = menu.addAction(self.tr("Compare to latest"))
-			compareLatest.triggered.connect(self.compareToLatest)
+			dbObjType = item.parent()
+			dbObjTypeText = dbObjType.text(0)
 
-			compareVersion = menu.addAction(self.tr("Compare to other edit history"))
-			compareVersion.triggered.connect(self.compareOtherVersion)
+			database = dbObjType.parent()
+			databaseText = database.text(0)
 
-			compareCommit = menu.addAction(self.tr("Compare to other commits"))
-			compareCommit.triggered.connect(self.compareOtherCommit)
+			if indexes == []:
+				menu = QtWidgets.QMenu()
 
-			removeObj = menu.addAction(self.tr("Delete to Workspace"))
-			removeObj.triggered.connect(self.removeObj)
+				if dbObjTypeText == 'TABLE':
+					generate = menu.addAction(self.tr("View Schema"))
+					generate.triggered.connect(self.generateObjectScript)
 
-			inexclude = menu.addAction(self.tr("Include/Exclude"))
-			inexclude.triggered.connect(self.inexclude)
+					generate = menu.addAction(self.tr("Compile Edit History(commit script)"))
+					generate.triggered.connect(lambda: self.viewEditHistoryCompile(databaseText, dbObjTypeText, itemText))
+				else:
+					generate = menu.addAction(self.tr("View Object/Info"))
+					generate.triggered.connect(self.generateObjectScript)
 
-			menu.exec_(self.objListTab.viewport().mapToGlobal(position))
+					#compareLatest = menu.addAction(self.tr("Compare to latest"))
+					compareLatest = menu.addAction(self.tr("Compare to latest edit"))
+					compareLatest.triggered.connect(self.compareToLatest)
+
+					compareVersion = menu.addAction(self.tr("Compare to other edit history"))
+					compareVersion.triggered.connect(self.compareOtherVersion)
+
+					compareCommit = menu.addAction(self.tr("Compare to other commits"))
+					compareCommit.triggered.connect(self.compareOtherCommit)
+
+				removeObj = menu.addAction(self.tr("Delete to Workspace"))
+				removeObj.triggered.connect(self.removeObj)
+
+				inexclude = menu.addAction(self.tr("Include/Exclude"))
+				inexclude.triggered.connect(self.inexclude)
+
+				menu.exec_(self.objListTab.viewport().mapToGlobal(position))
 
 	def openCommitMenu(self, position):
 		indexes = self.lstCommits.selectedIndexes()
@@ -342,11 +362,16 @@ class Layout(QtWidgets.QWidget):
 
 			menu.exec_(self.lstCommits.viewport().mapToGlobal(position))
 
+	def viewEditHistoryCompile(self, databaseText, dbObjTypeText, itemText):
+		print("Show edit history compile window")
+		versionList = generateVersionList(databaseText, dbObjTypeText, itemText)
+		compHist.layout.setEditData(versionList)
+		compHist.show()
 
 	def generateMergeCommitObjectList(self):
 		# globalvars.connectionMode = 'mergeserver'
 		# #conn.layout.setButtonFunction(self)
-
+		
 		if self.connected:
 			self.txtCommitID.show()
 			self.btnPatch.show()
@@ -690,5 +715,7 @@ if __name__ == '__main__':
 	compare = CompareOther()
 
 	about = AboutWindow()
+
+	compHist = CompileHistory()
 	
 	sys.exit(app.exec_())

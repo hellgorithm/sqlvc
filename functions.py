@@ -11,7 +11,7 @@ import hashlib
 import decimal
 # from Crypto.Cipher import AES
 # from Crypto.Hash import SHA256
-# import base64
+import base64
 import uuid
 import traceback
 
@@ -355,11 +355,23 @@ def generateObjectScript(user, database, objType, objName, rowId = None):
 
 	if globalvars.engine == "Microsoft SQL Server":
 		if rowId == None:
-			query = get_latest_script_by_user(user, database, objType, objName)
+			if objType == 'TABLE':
+				query = get_latest_script_v2(user, database, objType[0:1], objName.split(".")[1])
+			else:
+				query = get_latest_script_by_user(user, database, objType, objName)
 		else:
 			query = get_latest_script_by_rowid(str(rowId))
 
-		conn = pyodbc.connect(globalvars.connString)
+
+		if objType == 'TABLE':
+			if globalvars.authType == "Windows Authentication":
+				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + globalvars.server + ";DATABASE=" + database + ";Trusted_Connection=yes;"
+			else:
+				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + globalvars.server + ";DATABASE=" + database + ";UID=" + globalvars.username + ";PWD=" + globalvars.password
+		else:
+			connString = globalvars.connString
+
+		conn = pyodbc.connect(connString)
 		cursor = conn.cursor()
 		cursor.execute(query)
 		rows = cursor.fetchall()
@@ -497,12 +509,12 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 			obj2 = generateRemoteScript(server2, auth2, serverUser2, serverPass2, db2, objType2, objName2)
 			
 			targetDB = db2
-	c1 = open(name1, "w")
+	c1 = open(name1.replace("\r\n","\n"), "w")
 	c1.write(obj1)
 	c1.close()
 
 
-	c2 = open(name2, "w")
+	c2 = open(name2.replace("\r\n","\n"), "w")
 	c2.write(obj2)
 	c2.close()
 
@@ -541,9 +553,9 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 				if reply == QtWidgets.QMessageBox.Ok:
 					print(toApply)
 					if compareType == 'compareToServer':
-						checkForApply(toApply, targetDB, auth2, server2, serverUser2, serverPass2)
+						checkForApply(toApply, targetDB, auth2, server2, serverUser2, serverPass2, objType2)
 					else:
-						checkForApply(toApply,targetDB)
+						checkForApply(toApply,targetDB, '', '', '', '', objType2)
 
 				if name1 != "":
 					os.remove(name1)
@@ -560,7 +572,7 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 		reply  = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", apply_message,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
 
 
-def checkForApply(mergedFile, targetDB,targetAuth = '', targetServer = '', targetUser = '', targetPass = ''):
+def checkForApply(mergedFile, targetDB,targetAuth = '', targetServer = '', targetUser = '', targetPass = '', targetType = ''):
 	try:
 		if globalvars.engine == "Microsoft SQL Server":
 
@@ -586,7 +598,11 @@ def checkForApply(mergedFile, targetDB,targetAuth = '', targetServer = '', targe
 			
 			conn = pyodbc.connect(connString, autocommit=True)
 			cursor = conn.cursor()
-			cursor.execute(mergedFile.decode('UTF-8'))
+
+			if targetType == 'TABLE':
+				print("table")
+			else:
+				cursor.execute(mergedFile.decode('UTF-8'))
 
 			message = "Successfully applied script"
 			reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Apply Merged", message,  QtWidgets.QMessageBox.Ok)
@@ -672,13 +688,12 @@ def commitToOtherServer(commitPanel):
 
 
 								query2 = save_commit_detail(commitID, rowId)
-								print(query2)
 
 								print("commiting items")
 								cursor.execute(query2)
 
 								query_delete = """delete from [SQLVC].[dbo].[UserWorkspace] where RowId in (""" + rowId + """);"""
-								print(query_delete)
+								
 								print("deleting commited item in workspace")
 								cursor.execute(query_delete)
 
@@ -719,14 +734,10 @@ def CommitChanges(MainWindow, flag=''):
 
 				if globalvars.engine == "Microsoft SQL Server":
 					rowId = ",".join(selected_items)
-					query = """select case when (select top 1 LoginName from [dbo].[DDLEvents] 
-								where DatabaseName=ws.DatabaseName and SchemaName=ws.SchemaName and ObjectType=ws.ObjectType and ObjectName=ws.ObjectName 
-								order by RowID desc) = ws.LoginName 
-								then 'ok' else 'conflict' end,*
-								from [dbo].[UserWorkspace] ws where RowId in (""" + rowId + """)"""
+					query = checkConflict(rowId)
 					
 					conn = pyodbc.connect(globalvars.connString)
-
+					#print(query)
 					cursor = conn.cursor()
 					rows = cursor.execute(query)
 
@@ -963,6 +974,39 @@ def getCommitDetails(commitid):
 	except Exception as e:
 		saveLog(traceback.format_exc())
 		error_message = "Error getting commit details. Please see log file for details."
+		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Remove Item", error_message,  QtWidgets.QMessageBox.Ok)
+
+def encode(key, clear):
+    enc = []
+    for i in range(len(clear)):
+        key_c = key[i % len(key)]
+        enc_c = chr((ord(clear[i]) + ord(key_c)) % 256)
+        enc.append(enc_c)
+    return base64.urlsafe_b64encode("".join(enc).encode()).decode()
+
+def decode(key, enc):
+    dec = []
+    enc = base64.urlsafe_b64decode(enc).decode()
+    for i in range(len(enc)):
+        key_c = key[i % len(key)]
+        dec_c = chr((256 + ord(enc[i]) - ord(key_c)) % 256)
+        dec.append(dec_c)
+    return "".join(dec)
+
+
+def getCompiledScripts(id):
+	try:
+		if globalvars.engine == "Microsoft SQL Server":
+			query = """SELECT [EventDDL] FROM [SQLVC].[dbo].[DDLEvents] where RowID in ("""+id+""") order by RowID asc"""
+			conn = pyodbc.connect(globalvars.connString, autocommit=True)
+			cursor = conn.cursor()
+			data = cursor.execute(query)
+			return data
+
+
+	except Exception as e:
+		saveLog(traceback.format_exc())
+		error_message = "Error compiling scripts. Please see log file for details."
 		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Remove Item", error_message,  QtWidgets.QMessageBox.Ok)
 			
 
