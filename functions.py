@@ -79,7 +79,8 @@ def OpenConnection(connectWindow):
 		authType = connectWindow.cmbAuthType.currentText()
 
 		stat = testConn(serverType, server, authType, username, password)
-		if stat:
+		
+		if stat == True:
 
 			globalvars.engine = serverType
 			globalvars.server = server
@@ -99,10 +100,15 @@ def OpenConnection(connectWindow):
 				getUserObject()
 				getChangesets()
 
+
 			connectWindow.btnCancel.click()
 		else:
-			error_message = "Could not connect to database server!"
-			QtWidgets.QMessageBox.about(connectWindow, "Error", error_message)
+			if stat == "lib":
+				error_message = "The driver " + globalvars.SQLSERVER + " is not properly configured."
+				QtWidgets.QMessageBox.about(connectWindow, "Error", error_message)
+			else:
+				error_message = "Could not connect to database server!"
+				QtWidgets.QMessageBox.about(connectWindow, "Error", error_message)
 
 	except Exception as e:
 		saveLog(traceback.format_exc())
@@ -132,7 +138,7 @@ def configureDB(connectWindow):
 	except Exception as e:
 		saveLog(traceback.format_exc())
 		print("Database does not exists, create one...")
-		error_message = "SQLVC scripts not found. Click OK to install."
+		error_message = "SQLVC installation not found. Click OK to install. \n\nYou must be a member of database administrator in order to install SQLVC."
 		reply = QtWidgets.QMessageBox.question(connectWindow, "Install Scripts", error_message,  QtWidgets.QMessageBox.Ok)
 		
 		if reply == QtWidgets.QMessageBox.Ok:
@@ -220,6 +226,10 @@ def testConn(serverType, server, authType, username = None, password = None):
 		except Exception as e:
 			saveLog(traceback.format_exc())
 			print("Connection error!")
+
+			if "Can't open lib" in str(traceback.format_exc()):
+				return "lib"
+
 			return False
 
 def saveLog(message):
@@ -457,14 +467,19 @@ def generateCommitListPerItem(database, objType, objName):
 
 
 def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, compareType, rowId1 = '', rowId2 = '', server1 = '', server2 = '', serverUser1 = '', serverUser2 = '', serverPass1 = '', serverPass2 = '', auth1 = '', auth2 = ''):
-	compare_directory = str(tempfile.gettempdir()) + "/"
+	compare_directory = str(tempfile.gettempdir()) + "/slvc_tmp/"
 	obj1 = ""
 	obj2 = ""
 	name1 = ""
 	name2 = ""
+	name_preserve = ""
+	overwrite = True
 	targetDB = ""
 	hash_md5 = hashlib.md5()
 	hexdigest = ""
+	#added subdirectory 
+	if not os.path.isdir(compare_directory):
+		os.makedirs(compare_directory)
 
 	if globalvars.engine == "Microsoft SQL Server":
 		if compareType == "compareLatest": #compare your edits to currently applied
@@ -475,6 +490,7 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 			# hash_md5.update(obj2.encode("utf-8"))
 			# hexdigest = hash_md5.hexdigest()
 			targetDB = db2
+			name_preserve = objName2 + "_LATEST_USERVERSION.sql"
 
 		elif compareType == "compareversion": #compare your edits to other versions
 			name1 = compare_directory + objName1 + "_HISTORY("+str(rowId1)+").sql"
@@ -484,6 +500,7 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 			obj2 = generateObjectScript(user, db2, objType2, objName2) #latest version of the user
 
 			targetDB = db2
+			name_preserve = objName2 + "_LATEST_USERVERSION.sql"
 
 		elif compareType == "comparecommit": #compare your edits to other commit
 			name1 = compare_directory + objName1 + "_COMMIT("+str(rowId1)+").sql"
@@ -492,6 +509,7 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 			obj1 = generateCommitScript(user, db1, objType1, objName1, rowId1) #latest version of the script
 			obj2 = generateObjectScript(user, db2, objType2, objName2) #latest version of the user
 			targetDB = db2
+			name_preserve = objName2 + "_LATEST_USERVERSION.sql"
 
 		elif compareType == "comparecommit2":
 			name1 = compare_directory + objName1 + "_COMMIT("+str(rowId1)+").sql"
@@ -501,6 +519,7 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 			obj2 = generateCommitScript(user, db2, objType2, objName2, rowId2) #latest version of the script
 
 			targetDB = db2
+			name_preserve = objName2 + "_COMMIT("+str(rowId2)+").sql"
 
 		elif compareType == "compareToServer":
 			name1 = compare_directory + objName1 + "_COMMIT("+str(rowId1)+").sql"
@@ -510,14 +529,28 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 			obj2 = generateRemoteScript(server2, auth2, serverUser2, serverPass2, db2, objType2, objName2)
 			
 			targetDB = db2
-	c1 = open(name1.replace("\r\n","\n"), "w")
-	c1.write(obj1)
+			name_preserve = objName2 + "_SERVER("+str(server2.replace("\\","-"))+").sql"
+
+	c1 = open(name1, "w")
+	c1.write(obj1.replace("\r\n","\n"))
 	c1.close()
 
+	#added in case of error or user decided to re-open merged file instead
+	if os.path.exists(name2):
+		msgBox = QtWidgets.QMessageBox()
+		msgBox.setText('A merged file for '+name_preserve+' has been preserved. What would you like to do?')
+		msgBox.addButton(QtWidgets.QPushButton('Overwrite'), QtWidgets.QMessageBox.YesRole)
+		msgBox.addButton(QtWidgets.QPushButton('Re-open file'), QtWidgets.QMessageBox.NoRole)
+		msgBox.addButton(QtWidgets.QPushButton('Cancel'), QtWidgets.QMessageBox.RejectRole)
+		reply = msgBox.exec_()
 
-	c2 = open(name2.replace("\r\n","\n"), "w")
-	c2.write(obj2)
-	c2.close()
+		if reply == 1:
+			overwrite = False
+
+	if overwrite:
+		c2 = open(name2, "w")
+		c2.write(obj2.replace("\r\n","\n"))
+		c2.close()
 
 	#read again..bug for windows...hashes are not same
 	beforeEdit = open(name2, "rb")
@@ -530,7 +563,8 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 
 	exePath = globalvars.sett.layout.readExePath()
 
-	if len(exePath) > 0:
+	if exePath != None and len(exePath) > 0:
+		delete = True
 		p = subprocess.Popen([exePath, name1, name2], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		output, err = p.communicate(b"input data that is passed to subprocess' stdin")
 		rc = p.returncode
@@ -546,28 +580,46 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 			new_hash_md5.update(toApply)
 
 			#check there are changes in script file
-			if hexdigest != new_hash_md5.hexdigest():
+			#added option to re-check file application if re-opened un-applied merged file
+			if hexdigest != new_hash_md5.hexdigest() or overwrite == False:
 
-				apply_message = "Apply merged files? You cannot push your code unless you owned the latest version."
-				reply  = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", apply_message,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
+				# apply_message = "Apply merged files? You cannot push your code unless you owned the latest version."
+				# reply  = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", apply_message,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
 
-				if reply == QtWidgets.QMessageBox.Ok:
-					print(toApply)
+				msgBox = QtWidgets.QMessageBox()
+				msgBox.setText('Apply merged files? You cannot push your code unless you owned the latest version.')
+				msgBox.addButton(QtWidgets.QPushButton('Apply merge'), QtWidgets.QMessageBox.YesRole)
+				msgBox.addButton(QtWidgets.QPushButton('Preserve merge, I\'ll comeback later'), QtWidgets.QMessageBox.NoRole)
+				msgBox.addButton(QtWidgets.QPushButton('Discard changes and exit'), QtWidgets.QMessageBox.RejectRole)
+				reply = msgBox.exec_()
+
+				
+				if reply == 0:
+					
 					if compareType == 'compareToServer':
 						checkForApply(toApply, targetDB, auth2, server2, serverUser2, serverPass2, objType2)
 					else:
 						checkForApply(toApply,targetDB, '', '', '', '', objType2)
 
-				if name1 != "":
-					os.remove(name1)
+				if reply == 1:
+					delete = False
 
-				if name2 != "":
-					os.remove(name2)
+				# if name1 != "":
+				# 	os.remove(name1)
+
+				# if name2 != "":
+				# 	os.remove(name2)
 
 			if compareType == "compareversion":
 				globalvars.compareObj.show()
 				globalvars.compareObj.setWindowFlags(globalvars.compareObj.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
+		
+		if delete:
+			if name1 != "":
+				os.remove(name1)
 
+			if name2 != "":
+				os.remove(name2)
 	else:
 		apply_message = "No difftool found. Please define one in Edit > Preferences > Difftool"
 		reply  = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", apply_message,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)

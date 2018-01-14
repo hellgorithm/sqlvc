@@ -12,6 +12,8 @@ from comparewindow import *
 from settingswindow import *
 from connectwindow import *
 from queries import *
+import webbrowser
+import urllib2
 
 import traceback
 
@@ -75,6 +77,20 @@ class MainWindow(QtWidgets.QMainWindow):
 		close_action.triggered.connect(self.close_windows)
 		
 		#self.setStyleSheet("""background-color:#424242;color:#f4f4f4;""");
+	def checkUpdates(self):
+		try:
+			data = urllib2.urlopen(globalvars.version_url)
+			for line in data:
+				if str(globalvars.version) != str(line.replace("\n", "")):
+					dl_msg = "SQLVC " + str(line.replace("\n", "")) + " is now available. Download now?"
+					reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Updates available", dl_msg,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
+					if reply == QtWidgets.QMessageBox.Ok:
+						webpage = globalvars.dl_url
+						webbrowser.open_new_tab(webpage)
+
+		except Exception as e:
+			saveLog(traceback.format_exc())
+			print("Connection error occured for merge")
 
 	def setDarkMode(self, mainWindow):
 		styleSheet = """
@@ -82,9 +98,14 @@ class MainWindow(QtWidgets.QMainWindow):
 			    alternate-background-color: #605e5e;
 			    background: #424242;
 			}
+
+			QTabBar::tab {
+				background: #38393b;
+			}
 			"""
 		mainWindow.setStyleSheet("""background-color:#424242;color:#f4f4f4;""");
 		mainWindow.layout.lstCommits.setStyleSheet(styleSheet)
+		mainWindow.layout.fileParentTab.setStyleSheet(styleSheet)
 		globalvars.darkmode = True
 
 	def refreshConn(self):
@@ -371,7 +392,7 @@ class Layout(QtWidgets.QWidget):
 	def generateMergeCommitObjectList(self):
 		# globalvars.connectionMode = 'mergeserver'
 		# #conn.layout.setButtonFunction(self)
-		
+
 		if self.connected:
 			self.txtCommitID.show()
 			self.btnPatch.show()
@@ -491,6 +512,9 @@ class Layout(QtWidgets.QWidget):
 			menu = QtWidgets.QMenu()
 			generate = menu.addAction(self.tr("Compare to other commit"))
 			generate.triggered.connect(self.compareToOtherCommit)
+
+			#latestVersion = menu.addAction(self.tr("Compare to latest version"))
+			#latestVersion = menu.addAction(self.tr("Rollback"))
 			#generate.triggered.connect(lambda:self.generateCommitObjectList(self.lstCommitsModel.data(indexes[0]), self.lstCommitsModel.data(indexes[2])))
 
 			menu.exec_(self.commitList.viewport().mapToGlobal(position))
@@ -717,5 +741,7 @@ if __name__ == '__main__':
 	about = AboutWindow()
 
 	compHist = CompileHistory()
+
+	mw.checkUpdates()
 	
 	sys.exit(app.exec_())

@@ -13,7 +13,7 @@ compareObj = None
 masterPassword = "P@ssw0rd"
 openedCommitTab = []
 openedCommitTabText = []
-version = "alpha 1.3"
+version = "alpha 1.4"
 darkmode = False
 connectionMode = 'connectserver'
 serverTypeMerge = None
@@ -21,6 +21,8 @@ serverMerge = None
 usernameMerge = None
 passwordMerge = None
 authTypeMerge = None
+version_url = "http://hellgorithm.github.io/sqlvc_version.txt"
+dl_url = "https://github.com/hellgorithm/sqlvc#binary"
 
 #ENGINE MSSSQL
 DBTEST = "master"

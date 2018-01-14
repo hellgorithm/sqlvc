@@ -36,10 +36,15 @@ class AboutLayout(QtWidgets.QWidget):
 		grid_layout = QtWidgets.QGridLayout(self)
 
 		labelDiffTool = QtWidgets.QLabel(self)
-		labelDiffTool.setText("SQLVC " + globalvars.version +  "\n\nSQLVC Cross platform version control for SQL server. For source code\n visit https://github.com/hellgorithm/sqlvc\n\nDeveloper : Hellgorithm")
+		labelDiffTool.setText("SQLVC " + globalvars.version +  "\n\nSQLVC Cross platform version control for SQL server.")
 		labelDiffTool.setOpenExternalLinks(True)
 
+		labelDiffTool2 = QtWidgets.QLabel(self)
+		labelDiffTool2.setText('Source code : <a href="//github.com/hellgorithm/sqlvc">github.com/hellgorithm/sqlvc</a><br>Developer : Hellgorithm<br>Copyright 2018')
+		labelDiffTool2.setOpenExternalLinks(True)
+
 		grid_layout.addWidget(labelDiffTool, 0, 0, 1, 3)
+		grid_layout.addWidget(labelDiffTool2, 1, 0, 1, 3)
 
 class SettingsWindow(QtWidgets.QMainWindow):
 	def __init__(self, parent=None):
