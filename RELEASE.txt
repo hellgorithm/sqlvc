@@ -1,0 +1,8 @@
+Alpha 1.5
+- fix tab initialization
+- adding filters for object and commit
+- added save state for window
+
+Alpha 1.4
+- added option to preserve merge file for future use instead of overwriting
+- added option to reopen merge file instead of re-downloading 

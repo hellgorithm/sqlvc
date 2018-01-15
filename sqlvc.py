@@ -13,7 +13,13 @@ from settingswindow import *
 from connectwindow import *
 from queries import *
 import webbrowser
-import urllib2
+
+try:
+    import urllib.request as urllib2
+    update = "urllib"
+except ImportError:
+    import urllib2
+    update = "urllib2"
 
 import traceback
 
@@ -75,18 +81,31 @@ class MainWindow(QtWidgets.QMainWindow):
 
 		# use `connect` method to bind signals to desired behavior
 		close_action.triggered.connect(self.close_windows)
+
+		self.restoreState()
 		
 		#self.setStyleSheet("""background-color:#424242;color:#f4f4f4;""");
+	
 	def checkUpdates(self):
 		try:
 			data = urllib2.urlopen(globalvars.version_url)
-			for line in data:
-				if str(globalvars.version) != str(line.replace("\n", "")):
-					dl_msg = "SQLVC " + str(line.replace("\n", "")) + " is now available. Download now?"
-					reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Updates available", dl_msg,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
-					if reply == QtWidgets.QMessageBox.Ok:
-						webpage = globalvars.dl_url
-						webbrowser.open_new_tab(webpage)
+			dl_msg = ""
+			print(update)
+			if update == "urllib2":
+				for line in data:
+					if str(globalvars.version) != str(line.replace("\n", "")):
+						dl_msg = "SQLVC " + str(line.replace("\n", "")) + " is now available. Download now?"
+			else:
+				version = str(data.read().decode('UTF-8')).replace("\n", "")
+				
+				if str(globalvars.version) != str(version):
+					dl_msg = "SQLVC " + version + " is now available. Download now?"
+
+			if len(dl_msg) > 0:
+				reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Updates available", dl_msg,  QtWidgets.QMessageBox.Ok,  QtWidgets.QMessageBox.Cancel)
+				if reply == QtWidgets.QMessageBox.Ok:
+					webpage = globalvars.dl_url
+					webbrowser.open_new_tab(webpage)
 
 		except Exception as e:
 			saveLog(traceback.format_exc())
@@ -123,6 +142,25 @@ class MainWindow(QtWidgets.QMainWindow):
 
 	def close_windows(self):
 		self.close()
+
+	def closeEvent(self, event):
+		self.settings = QtCore.QSettings("SQLVC", "sqlvc_app")
+		self.settings.setValue("geometry", self.saveGeometry())
+		self.settings.setValue("windowState", self.saveState())
+		self.settings.setValue("splitterSettings", self.layout.splitter.saveState())
+
+	def restoreState(self):
+		self.settings = QtCore.QSettings("SQLVC", "sqlvc_app")
+
+		if not self.settings.value("geometry") == None:
+			self.restoreGeometry(self.settings.value("geometry"))
+
+		if not self.settings.value("windowState") == None:
+			self.restoreState(self.settings.value("windowState"))
+
+		if self.settings.value("splitterSettings"):
+			self.layout.splitter.restoreState(self.settings.value("splitterSettings"))
+
 
 	def setSQLWindowTitle(self):
 		title = "SQLVC "+ globalvars.version+" - " + globalvars.server + "[" + globalvars.username + "]"
@@ -166,10 +204,11 @@ class Layout(QtWidgets.QWidget):
 		# create and set layout to place widgets
 
 		grid_layout = QtWidgets.QGridLayout(self)
-		splitter = QtWidgets.QSplitter(self)
+		self.splitter = QtWidgets.QSplitter(self)
 
 		self.fileParentTab = QtWidgets.QTabWidget()
 		self.contParentTab = QtWidgets.QTabWidget()
+		self.fileParentTab.currentChanged.connect(self.initData)
 		#self.contParentTab_layout = QtWidgets.QGridLayout(self)
 
 		fileList = QtWidgets.QWidget()
@@ -200,10 +239,16 @@ class Layout(QtWidgets.QWidget):
 
 		self.commitMessage = QtWidgets.QPlainTextEdit(self)
 		self.commitMessage.setFixedHeight(70)
+		self.commitMessage.setPlaceholderText("Enter commit message") 
+
 		self.btnCommit = QtWidgets.QPushButton("Commit")
 		self.btnCommit.setMaximumWidth(100)
 		self.btnCommit.clicked.connect(lambda: CommitChanges(self))
 
+
+		self.txtSearch = QtWidgets.QLineEdit(self)
+		self.txtSearch.setPlaceholderText("Filter Objects") 
+		self.txtSearch.textChanged.connect(self.filterObjects)
 
 		self.objListTab = QtWidgets.QTreeWidget()
 		self.objListTab.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -253,7 +298,9 @@ class Layout(QtWidgets.QWidget):
 
 		fileList.layout.addWidget(self.btnCommit,0,0,1,1)
 		fileList.layout.addWidget(self.commitMessage,1,0,1,1)
-		fileList.layout.addWidget(self.objListTab,2,0,1,1)
+		fileList.layout.addWidget(self.txtSearch,2,0,1,1)
+		fileList.layout.addWidget(self.objListTab,3,0,1,1)
+
 		self.contentTab.layout.addWidget(self.lstEdited, 0,0, 1,2)
 		self.conflictTab.layout.addWidget(self.conflictList, 0,0, 1,2)
 		versionTab.layout.addWidget(self.versionList,0,0,1,1)
@@ -270,12 +317,12 @@ class Layout(QtWidgets.QWidget):
 		#trObjList = QtWidgets.QTreeView()
 
 		#end treeview
-		splitter.addWidget(self.contParentTab)
-		splitter.addWidget(self.fileParentTab)
+		self.splitter.addWidget(self.contParentTab)
+		self.splitter.addWidget(self.fileParentTab)
 
 		# grid_layout.addWidget(self.contParentTab, 1, 0, 1, 2)
 		# grid_layout.addWidget(self.fileParentTab, 1, 2, 1, 2) #row, column, height, width
-		grid_layout.addWidget(splitter)
+		grid_layout.addWidget(self.splitter)
 
 
 		globalvars.MainWindow = self
@@ -288,8 +335,20 @@ class Layout(QtWidgets.QWidget):
 		self.connected = False
 		self.connString = None
 
-	def showCommitDetails(self):
-		print("hello")
+	# def keyPressEvent(self, widget, e):
+	# 	QtWidgets.QLineEdit.keyPressEvent(widget, e)
+
+	def filterObjects(self):
+		value = self.txtSearch.text()
+
+		if len(globalvars.databaseEdits) > 0:
+			globalvars.objListTab.clear()
+			trViewObjects = treeModel()
+			trViewObjects.generateView(globalvars.objListTab, globalvars.databaseEdits, value)
+
+
+	# def filterObjects(self):
+	# 	print("hello")
 
 	def removeConflictTab(self, index):
 		self.fileParentTab.removeTab(index)
@@ -532,63 +591,96 @@ class Layout(QtWidgets.QWidget):
 
 	def generateCommitObjectList(self, commitid, commitMessage, mode):
 		if commitid not in globalvars.openedCommitTabText:
-			commitInfo = QtWidgets.QWidget()
+			self.commitInfo = QtWidgets.QWidget()
 
 			commitTitle = "Commit [" + commitid + "]"
 
 			self.commitid = commitid
 
-			self.fileParentTab.addTab(commitInfo, commitTitle)
-			commitInfo.layout = QtWidgets.QGridLayout(self)
-			commitInfo.setLayout(commitInfo.layout)
+			self.fileParentTab.addTab(self.commitInfo, commitTitle)
+			self.commitInfo.layout = QtWidgets.QGridLayout(self)
+			self.commitInfo.setLayout(self.commitInfo.layout)
 
-			self.txtCommitID = QtWidgets.QLineEdit(self)
-			commitInfo.layout.addWidget(self.txtCommitID,0,2,1,1)
+			self.txtCommitID = QtWidgets.QLineEdit(self) #0
+			self.commitInfo.layout.addWidget(self.txtCommitID,0,2,1,1)
 			self.txtCommitID.setReadOnly(True)
-			self.txtCommitID.setText(commitid)
+			self.txtCommitID.setText(self.commitid)
 
-			self.txtCommitMessage = QtWidgets.QPlainTextEdit(self)
-			commitInfo.layout.addWidget(self.txtCommitMessage,1,0,1,3)
+			self.txtCommitMessage = QtWidgets.QPlainTextEdit(self) #0
+			self.commitInfo.layout.addWidget(self.txtCommitMessage,1,0,1,3)
 			self.txtCommitMessage.setFixedHeight(70)
 			self.txtCommitMessage.setReadOnly(True)
 			self.txtCommitMessage.document().setPlainText(commitMessage)
 
-			self.btnOpenServer = QtWidgets.QPushButton("Apply to...")
-			commitInfo.layout.addWidget(self.btnOpenServer,0,0,1,1)
+			self.btnOpenServer = QtWidgets.QPushButton("Apply to...") #0
+			self.commitInfo.layout.addWidget(self.btnOpenServer,0,0,1,1)
 			self.btnOpenServer.clicked.connect(self.generateMergeCommitObjectList)
 			self.btnOpenServer.setMaximumWidth(110)
 
-			self.btnCommitMerge = QtWidgets.QPushButton("Commit")
-			commitInfo.layout.addWidget(self.btnCommitMerge,0,1,1,1)
+			self.btnCommitMerge = QtWidgets.QPushButton("Commit") #1
+			self.commitInfo.layout.addWidget(self.btnCommitMerge,0,1,1,1)
 			self.btnCommitMerge.clicked.connect(lambda: commitToOtherServer(self))
 			self.btnCommitMerge.setMaximumWidth(100)
 			self.btnCommitMerge.hide()
 
-			self.btnPatch = QtWidgets.QPushButton("Create Patch")
-			commitInfo.layout.addWidget(self.btnPatch,0,1,1,1)
+			self.btnPatch = QtWidgets.QPushButton("Create Patch") #2
+			self.commitInfo.layout.addWidget(self.btnPatch,0,1,1,1)
 			self.btnPatch.clicked.connect(self.createPatch)
 			self.btnPatch.setMaximumWidth(100)
 			#self.btnOpenServer.clicked.connect(lambda: CommitChanges(self))
 
-			self.commitList = QtWidgets.QTreeWidget()
-			commitInfo.layout.addWidget(self.commitList,2,0,3,3)
+			self.txtCommitFilter = QtWidgets.QLineEdit(self) #1
+			self.txtCommitFilter.textChanged.connect(self.filterCommitObjects)
+			self.txtCommitFilter.setPlaceholderText("Filter commit objects") 
+			self.commitInfo.layout.addWidget(self.txtCommitFilter,2,0,1,3)
+
+			self.commitList = QtWidgets.QTreeWidget() #0
+			self.commitInfo.layout.addWidget(self.commitList,3,0,3,3)
 			self.commitList.setHeaderLabels([commitid])
 			self.commitList.itemDoubleClicked.connect(self.generateCommitScript)
 			self.commitList.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 			self.commitList.customContextMenuRequested.connect(self.openCommitDetailsMenu)
+			
 
 			self.commitList.clear()
 
-			dataBaseCommits = getCommitDetails(commitid)
+			self.dataBaseCommits = getCommitDetails(commitid)
 			
 			trViewObjects = treeModel()
-			trViewObjects.generateView(self.commitList, dataBaseCommits)
+			trViewObjects.generateView(self.commitList, self.dataBaseCommits)
 
-			globalvars.openedCommitTabText.append(commitid)
-			globalvars.openedCommitTab.append(commitInfo)
+			globalvars.openedCommitTabText.append(self.commitid)
+			globalvars.openedCommitTab.append(self.commitInfo)
 
 		objIndex = globalvars.openedCommitTabText.index(commitid)
 		self.fileParentTab.setCurrentIndex((2 + objIndex))
+
+	def initData(self):
+		index = self.fileParentTab.currentIndex()
+		curr_tab = self.fileParentTab.currentWidget()
+		line_edit = curr_tab.findChildren(QtWidgets.QLineEdit)
+		tree = curr_tab.findChildren(QtWidgets.QTreeWidget)
+		plaintext = curr_tab.findChildren(QtWidgets.QPlainTextEdit)
+		buttons = curr_tab.findChildren(QtWidgets.QPushButton)
+		
+		if len(line_edit) > 0 and index not in range(2):
+			self.txtCommitID = line_edit[0]
+			self.txtCommitFilter = line_edit[1]
+
+			self.commitList = tree[0]
+			self.txtCommitMessage = plaintext[0]
+
+			self.btnOpenServer = buttons[0]
+			self.btnCommitMerge = buttons[1]
+			self.btnPatch = buttons[2]
+
+
+	def filterCommitObjects(self):
+		self.value = self.txtCommitFilter.text()
+		self.dataBaseCommits = getCommitDetails(self.commitid)
+		self.commitList.clear()
+		trViewObjects = treeModel()
+		trViewObjects.generateView(self.commitList, self.dataBaseCommits, self.value)
 
 	def generateCommitScript(self):
 		print("Viewing script info")

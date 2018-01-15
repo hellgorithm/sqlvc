@@ -6,7 +6,7 @@ class treeModel():
     def __init__(self):
         print("Setting up models")
 
-    def generateView(self, tw, dat):
+    def generateView(self, tw, dat, pfilter = ''):
         
         database = ""
         objectType = ""
@@ -49,16 +49,18 @@ class treeModel():
 
             #set db objects
             rdbObjects = str(row[2] + "." + row[3])
-            if obj != rdbObjects:
 
-                obj = rdbObjects
+            if pfilter.lower() in rdbObjects.lower() or pfilter == '':
+                if obj != rdbObjects:
 
-                dbObj = QtWidgets.QTreeWidgetItem(otype)
-                dbObj.setText(0, obj)
-                dbObj.setExpanded(True)
-                dbObj.setCheckState(0,QtCore.Qt.Unchecked)
-                dbObj.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
-                dbObj.setData(QtCore.Qt.UserRole, 0, row[0])
+                    obj = rdbObjects
+
+                    dbObj = QtWidgets.QTreeWidgetItem(otype)
+                    dbObj.setText(0, obj)
+                    dbObj.setExpanded(True)
+                    dbObj.setCheckState(0,QtCore.Qt.Unchecked)
+                    dbObj.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+                    dbObj.setData(QtCore.Qt.UserRole, 0, row[0])
 
             # for db in databases:
             #     dbObj = QtWidgets.QTreeWidgetItem(server)
