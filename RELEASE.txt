@@ -1,3 +1,9 @@
+Alpha 1.6
+- added saving workspace using shelf and other functionalities such as applying saved state to current workspace
+- saving password(current username)
+- adjustments on GUI
+- new icons
+
 Alpha 1.5
 - fix tab initialization
 - adding filters for object and commit

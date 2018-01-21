@@ -13,7 +13,7 @@ class ConnectionWindow(QtWidgets.QMainWindow):
 		self.layout = ConnectLayout(parent=self)
 		self.setWindowModality(QtCore.Qt.ApplicationModal)
 		self.setWindowTitle("Open Connection")
-		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
+		self.setWindowIcon(QtGui.QIcon('icons/sqlvc-icon.png'))
 		self.setCentralWidget(self.layout)
 		self.resize(250, 130)
 		self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)

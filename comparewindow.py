@@ -9,7 +9,7 @@ class CompareOther(QtWidgets.QMainWindow): #compare selection for other version 
 
 		self.layout = CompareLayout(parent=self)
 		self.setWindowTitle("Settings")
-		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
+		self.setWindowIcon(QtGui.QIcon('icons/sqlvc-icon.png'))
 		self.setCentralWidget(self.layout)
 		self.resize(500, 500)
 		#self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowStaysOnTopHint)
@@ -198,7 +198,7 @@ class CompileHistory(QtWidgets.QMainWindow):
 
 		self.layout = CompileLayout(parent=self)
 		self.setWindowTitle("Compile Table History")
-		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
+		self.setWindowIcon(QtGui.QIcon('icons/sqlvc-icon.png'))
 		self.setCentralWidget(self.layout)
 		self.resize(700, 500)
 		#self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowStaysOnTopHint)

@@ -30,7 +30,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		#initialize window
 		self.layout = Layout(parent=self)
 		self.setWindowTitle("SQLVC " + globalvars.version)
-		self.setWindowIcon(QtGui.QIcon('./openmonitor.png'))
+		self.setWindowIcon(QtGui.QIcon('icons/sqlvc-icon.png'))
 		self.setCentralWidget(self.layout)
 		self.resize(700, 600)
 		#self.setGeometry(10, 10, 700, 600)
