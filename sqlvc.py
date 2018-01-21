@@ -65,7 +65,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		preference_action.triggered.connect(self.openPreference)
 		preference_action.setShortcut(QtGui.QKeySequence("Ctrl+P"))
 
-		# dark_action = QtWidgets.QAction('&Dark Mode', self)
+		# dark_action = QtWidgets.QAction('&Dark Mode', self, checkable=True)
 		# edit_menu.addAction(dark_action)
 		# dark_action.triggered.connect(lambda:self.setDarkMode(self))
 		# dark_action.setShortcut(QtGui.QKeySequence("Ctrl+D"))
@@ -90,7 +90,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		try:
 			data = urllib2.urlopen(globalvars.version_url)
 			dl_msg = ""
-			print(update)
+			
 			if update == "urllib2":
 				for line in data:
 					if str(globalvars.version) != str(line.replace("\n", "")):
@@ -215,13 +215,15 @@ class Layout(QtWidgets.QWidget):
 
 		changesetListTab = QtWidgets.QWidget()
 
-		self.contentTab = QtWidgets.QWidget()
+		shelveListTab = QtWidgets.QWidget()
+
+		#self.contentTab = QtWidgets.QWidget()
 
 		versionTab = QtWidgets.QWidget()
 
 		self.conflictTab = QtWidgets.QWidget()
 
-		#self.lstCommits = QtWidgets.QListWidget(self)
+		#============================================================================
 		self.lstCommits = QtWidgets.QTreeView(self)
 
 		self.lstCommits.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
@@ -230,20 +232,36 @@ class Layout(QtWidgets.QWidget):
 
 		
 		self.lstCommitsModel = self.createCommitModel(self)
-		
 		self.lstCommits.setModel(self.lstCommitsModel)
 		self.lstCommits.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 		self.lstCommits.customContextMenuRequested.connect(self.openCommitMenu)
+
+		#=============================================================================
+
+		self.lstShelve = QtWidgets.QTreeView(self)
+
+		self.lstShelve.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+		self.lstShelve.setRootIsDecorated(False)
+		self.lstShelve.setAlternatingRowColors(True)
+
+		self.lstShelveModel = self.createShelveModel(self)
+		self.lstShelve.setModel(self.lstShelveModel)
+		self.lstShelve.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+		self.lstShelve.customContextMenuRequested.connect(self.openShelveMenu)
 		#self.addCommit(self.lstCommitsModel, 'service@github.com','soggy', 'Your Github Donation','03/25/2017 02:05 PM')
 
 
 		self.commitMessage = QtWidgets.QPlainTextEdit(self)
 		self.commitMessage.setFixedHeight(70)
-		self.commitMessage.setPlaceholderText("Enter commit message") 
+		self.commitMessage.setPlaceholderText("Enter commit/shelve message") 
 
 		self.btnCommit = QtWidgets.QPushButton("Commit")
 		self.btnCommit.setMaximumWidth(100)
 		self.btnCommit.clicked.connect(lambda: CommitChanges(self))
+
+		self.btnShelve = QtWidgets.QPushButton("Shelve")
+		self.btnShelve.clicked.connect(lambda: ShelveChanges(self))
+		self.btnShelve.setMaximumWidth(100)
 
 
 		self.txtSearch = QtWidgets.QLineEdit(self)
@@ -261,56 +279,70 @@ class Layout(QtWidgets.QWidget):
 		#tab
 
 		self.versionList = QtWidgets.QListWidget(self)
+		self.versionList.setAlternatingRowColors(True);
 		self.versionList.doubleClicked.connect(self.getItemVersionInfo)
 
 
 		self.conflictList = QtWidgets.QListWidget(self)
 
-		self.lstEdited = QtWidgets.QPlainTextEdit(self)
-		self.lstEdited.setReadOnly(True)
-		self.lstEdited.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
+		#self.lstEdited = QtWidgets.QPlainTextEdit(self)
+		#self.lstEdited.setReadOnly(True)
+		#self.lstEdited.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
 
 		self.fileParentTab.addTab(fileList, "Objects")
+		self.fileParentTab.addTab(versionTab, "Edit History")
 		self.fileParentTab.addTab(changesetListTab, "Commits")
+		self.fileParentTab.addTab(shelveListTab, "Shelf") #feature hold
+
 		self.fileParentTab.setTabsClosable(True)
-		self.fileParentTab.tabCloseRequested.connect(self.removeConflictTab)
+		self.fileParentTab.tabCloseRequested.connect(self.removeCommitTab)
 		#remove close button for other tabs
 		self.fileParentTab.tabBar().setTabButton(0, QtWidgets.QTabBar.RightSide,None)
 		self.fileParentTab.tabBar().setTabButton(1, QtWidgets.QTabBar.RightSide,None)
+		self.fileParentTab.tabBar().setTabButton(2, QtWidgets.QTabBar.RightSide,None)
+		self.fileParentTab.tabBar().setTabButton(3, QtWidgets.QTabBar.RightSide,None)
 
 
-		self.contParentTab.addTab(self.contentTab,"Details")
-		self.contParentTab.addTab(versionTab,"Edit History")
+		#self.contParentTab.addTab(self.contentTab,"Details")
+		#self.contParentTab.addTab(versionTab,"Edit History")
 		#self.contParentTab.addTab(self.conflictTab, "Conflicts") #hidden
 		self.contParentTab.setTabsClosable(True)
 		self.contParentTab.tabCloseRequested.connect(self.contParentTab.removeTab)
 		#remove close button for other tabs
-		self.contParentTab.tabBar().setTabButton(0, QtWidgets.QTabBar.RightSide,None)
-		self.contParentTab.tabBar().setTabButton(1, QtWidgets.QTabBar.RightSide,None)
+		#self.contParentTab.tabBar().setTabButton(0, QtWidgets.QTabBar.RightSide,None)
+		#self.contParentTab.tabBar().setTabButton(1, QtWidgets.QTabBar.RightSide,None)
 
+		#====================================================================================
 		changesetListTab.layout = QtWidgets.QGridLayout(self)
 		fileList.layout = QtWidgets.QGridLayout(self)
-		self.contentTab.layout = QtWidgets.QGridLayout(self)
+		shelveListTab.layout = QtWidgets.QGridLayout(self)
+		#self.contentTab.layout = QtWidgets.QGridLayout(self)
 		self.conflictTab.layout = QtWidgets.QGridLayout(self)
 		versionTab.layout = QtWidgets.QGridLayout(self)
+		#====================================================================================
 
 		changesetListTab.layout.addWidget(self.lstCommits, 1,0,1,1)
+		shelveListTab.layout.addWidget(self.lstShelve, 1,0,1,1)
 
 		fileList.layout.addWidget(self.btnCommit,0,0,1,1)
-		fileList.layout.addWidget(self.commitMessage,1,0,1,1)
-		fileList.layout.addWidget(self.txtSearch,2,0,1,1)
-		fileList.layout.addWidget(self.objListTab,3,0,1,1)
+		fileList.layout.addWidget(self.btnShelve,0,1,1,1)
+		fileList.layout.addWidget(self.commitMessage,1,0,1,4)
+		fileList.layout.addWidget(self.txtSearch,2,0,1,4)
+		fileList.layout.addWidget(self.objListTab,3,0,1,4)
 
-		self.contentTab.layout.addWidget(self.lstEdited, 0,0, 1,2)
+		#self.contentTab.layout.addWidget(self.lstEdited, 0,0, 1,2)
 		self.conflictTab.layout.addWidget(self.conflictList, 0,0, 1,2)
 		versionTab.layout.addWidget(self.versionList,0,0,1,1)
 
 		changesetListTab.setLayout(changesetListTab.layout)
+		shelveListTab.setLayout(shelveListTab.layout)
+
 		fileList.setLayout(fileList.layout)
-		self.contentTab.setLayout(self.contentTab.layout)
+		#self.contentTab.setLayout(self.contentTab.layout)
 		versionTab.setLayout(versionTab.layout)
 		self.conflictTab.setLayout(self.conflictTab.layout)
 
+		self.viewHistoryDetail()
 		# end tab
 
 		#treeview
@@ -338,6 +370,20 @@ class Layout(QtWidgets.QWidget):
 	# def keyPressEvent(self, widget, e):
 	# 	QtWidgets.QLineEdit.keyPressEvent(widget, e)
 
+	def viewHistoryDetail(self):
+		self.lstEdited = QtWidgets.QPlainTextEdit(self)
+		self.lstEdited.setReadOnly(True)
+		self.lstEdited.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
+
+		self.contentTab = QtWidgets.QWidget()
+		self.contentTab.layout = QtWidgets.QGridLayout(self)
+
+		self.contentTab.layout.addWidget(self.lstEdited, 0,0, 1,2)
+		self.contentTab.setLayout(self.contentTab.layout)
+
+		self.contParentTab.addTab(self.contentTab,"Details")
+		self.contParentTab.tabBar().setTabButton(0, QtWidgets.QTabBar.RightSide,None)
+
 	def filterObjects(self):
 		value = self.txtSearch.text()
 
@@ -350,10 +396,10 @@ class Layout(QtWidgets.QWidget):
 	# def filterObjects(self):
 	# 	print("hello")
 
-	def removeConflictTab(self, index):
+	def removeCommitTab(self, index):
 		self.fileParentTab.removeTab(index)
 		
-		tabArrIndex = (index - 2)
+		tabArrIndex = (index - 4)
 		del globalvars.openedCommitTab[tabArrIndex]
 		del globalvars.openedCommitTabText[tabArrIndex]
 
@@ -372,11 +418,26 @@ class Layout(QtWidgets.QWidget):
 		model.setData(model.index(0, self.COMMIT_USER), user)
 		model.setData(model.index(0, self.COMMIT_MESSAGE), message)
 		model.setData(model.index(0, self.COMMIT_DATE), date)
+
+	def createShelveModel(self,parent):
+		model = QtGui.QStandardItemModel(0, 4, parent)
+		model.setHeaderData(self.COMMIT_ID, QtCore.Qt.Horizontal, "Shelve ID")
+		model.setHeaderData(self.COMMIT_USER, QtCore.Qt.Horizontal, "User")
+		model.setHeaderData(self.COMMIT_MESSAGE, QtCore.Qt.Horizontal, "Shelve Message")
+		model.setHeaderData(self.COMMIT_DATE, QtCore.Qt.Horizontal, "Date")
+		return model
+
+	def addShelve(self,model, shelveID, user, message, date):
+		model.insertRow(0)
+		model.setData(model.index(0, self.COMMIT_ID), shelveID)
+		model.setData(model.index(0, self.COMMIT_USER), user)
+		model.setData(model.index(0, self.COMMIT_MESSAGE), message)
+		model.setData(model.index(0, self.COMMIT_DATE), date)
 	#end commit table creator
 
 	def showConflictTab(self):
 		self.contParentTab.addTab(self.conflictTab, "Conflicts")
-		self.contParentTab.setCurrentIndex(2)
+		self.contParentTab.setCurrentIndex(1)
 
 	def getItemVersionInfo(self):
 		rowId = self.versionList.selectedItems()[0].data(QtCore.Qt.UserRole)
@@ -391,18 +452,21 @@ class Layout(QtWidgets.QWidget):
 		item = self.objListTab.currentItem()
 
 		if item != None:
-			itemText = item.text(0)
-
-			dbObjType = item.parent()
-			dbObjTypeText = dbObjType.text(0)
-
-			database = dbObjType.parent()
-			databaseText = database.text(0)
+			
+			menu = QtWidgets.QMenu()
 
 			if indexes == []:
-				menu = QtWidgets.QMenu()
 
-				if dbObjTypeText == 'TABLE':
+				itemText = item.text(0)
+
+				dbObjType = item.parent()
+				dbObjTypeText = dbObjType.text(0)
+
+				database = dbObjType.parent()
+				databaseText = database.text(0)
+
+
+				if 'TABLE' in dbObjTypeText or 'COLUMN' in dbObjTypeText:
 					generate = menu.addAction(self.tr("View Schema"))
 					generate.triggered.connect(self.generateObjectScript)
 
@@ -422,25 +486,120 @@ class Layout(QtWidgets.QWidget):
 					compareCommit = menu.addAction(self.tr("Compare to other commits"))
 					compareCommit.triggered.connect(self.compareOtherCommit)
 
-				removeObj = menu.addAction(self.tr("Delete to Workspace"))
-				removeObj.triggered.connect(self.removeObj)
-
 				inexclude = menu.addAction(self.tr("Include/Exclude"))
 				inexclude.triggered.connect(self.inexclude)
 
-				menu.exec_(self.objListTab.viewport().mapToGlobal(position))
+			else:
+
+
+				includeAll = menu.addAction(self.tr("Include All"))
+				includeAll.triggered.connect(lambda:self.getAllChildren('include'))
+
+				excludeAll = menu.addAction(self.tr("Exclude All"))
+				excludeAll.triggered.connect(lambda:self.getAllChildren('exclude'))
+
+
+			removeObj = menu.addAction(self.tr("Delete to Workspace"))
+			removeObj.triggered.connect(self.removeObj)
+
+				#menu.exec_(self.objListTab.viewport().mapToGlobal(position))
+
+			
+			# undo = menu.addAction(self.tr("Undo"))
+			# undo.triggered.connect(lambda:self.rollbackEdits('count'))
+			menu.exec_(self.objListTab.viewport().mapToGlobal(position))
+
+	def getAllChildren(self, mode = ''):
+		item = self.objListTab.currentItem()
+		# print(item.childCount())
+
+		# print(item.child(0))
+
+		# print(item.parentCount())
+
+		selected_item = []
+
+		if item.childCount() == 0:
+			if mode == 'select':
+				rowId = item.data(QtCore.Qt.UserRole,0)
+				selected_item.append(str(rowId))
+			else:
+				self.includeExclude(item, mode)
+		else:
+			for i in range(item.childCount()):
+
+				child1 = item.child(i)
+
+				if child1.childCount() == 0:
+					if mode == 'select':
+						rowId = child1.data(QtCore.Qt.UserRole,0)
+						selected_item.append(str(rowId))
+					else:
+						self.includeExclude(child1, mode)
+
+				for j in range(child1.childCount()):
+
+					child2 = child1.child(j)
+
+					if child2.childCount() == 0:
+						if mode == 'select':
+							rowId = child2.data(QtCore.Qt.UserRole,0)
+							selected_item.append(str(rowId))
+						else:
+							self.includeExclude(child2, mode)
+
+					for k in range(child2.childCount()):
+
+						child3 = child2.child(k)
+
+						if child3.childCount() == 0:
+							if mode == 'select':
+								rowId = child3.data(QtCore.Qt.UserRole,0)
+								selected_item.append(str(rowId))
+							else:
+								self.includeExclude(child3, mode)
+
+						for l in range(child3.childCount()):
+							
+							child4 = child3.child(l)
+
+							if child4.childCount() == 0:
+								if mode == 'select':
+									rowId = child4.data(QtCore.Qt.UserRole,0)
+									selected_item.append(str(rowId))
+								else:
+									self.includeExclude(child4, mode)
+
+		return selected_item
+
+		# item = treeView.invisibleRootItem()
+		# selected_items = select_item(item)
+	def includeExclude(self, item, mode):
+		if mode == 'include':
+			item.setCheckState(0,QtCore.Qt.Checked)
+		else:
+			item.setCheckState(0,QtCore.Qt.Unchecked)
 
 	def openCommitMenu(self, position):
 		indexes = self.lstCommits.selectedIndexes()
 		if len(indexes) > 0:
 			menu = QtWidgets.QMenu()
 			generate = menu.addAction(self.tr("View Commit Info"))
-			generate.triggered.connect(lambda:self.generateCommitObjectList(self.lstCommitsModel.data(indexes[0]), self.lstCommitsModel.data(indexes[2]), 'viewcommit'))
+			generate.triggered.connect(lambda:self.generateDatabaseObjectList(self.lstCommitsModel.data(indexes[0]), self.lstCommitsModel.data(indexes[2]), 'viewcommit'))
 
 			# mergeCommit = menu.addAction(self.tr("Merge to other server"))
 			# mergeCommit.triggered.connect(lambda:self.generateMergeCommitObjectList(self.lstCommitsModel.data(indexes[0]), self.lstCommitsModel.data(indexes[2])))
 
 			menu.exec_(self.lstCommits.viewport().mapToGlobal(position))
+
+	def openShelveMenu(self, position):
+		indexes = self.lstShelve.selectedIndexes()
+		if len(indexes) > 0:
+			menu = QtWidgets.QMenu()
+			generate = menu.addAction(self.tr("View shelf details"))
+			#generate.triggered.connect(lambda:self.applyShelveToworkspace(self.lstShelveModel.data(indexes[0])))
+			generate.triggered.connect(lambda:self.generateDatabaseObjectList(self.lstShelveModel.data(indexes[0]), self.lstShelveModel.data(indexes[2]), 'viewshelve'))
+			menu.exec_(self.lstShelve.viewport().mapToGlobal(position))
 
 	def viewEditHistoryCompile(self, databaseText, dbObjTypeText, itemText):
 		print("Show edit history compile window")
@@ -475,8 +634,8 @@ class Layout(QtWidgets.QWidget):
 			conn.layout.btnOpen.clicked.connect(self.OpenConnectionMerge)
 			conn.show()
 
-			self.commitList.customContextMenuRequested.disconnect()
-			self.commitList.customContextMenuRequested.connect(self.openMergeCommitDetailsMenu)
+			# self.commitList.customContextMenuRequested.disconnect()
+			# self.commitList.customContextMenuRequested.connect(self.openMergeCommitDetailsMenu)
 
 		# #gnerate list
 		# self.generateCommitObjectList(commitid, commitMessage, 'mergecommit')
@@ -495,7 +654,7 @@ class Layout(QtWidgets.QWidget):
 			stat = testConn(serverType, server, authType, username, password)
 			if stat:
 				configPath = os.path.expanduser("~") + "/sqlvc/sqlvc-config.xml"
-				saveConfigurations(configPath, conn.layout)
+				saveConfigurations(configPath, conn.layout, 'nosave')
 
 				globalvars.engine = serverType
 				self.serverTypeMerge = conn.layout.cmbDbase.currentText()
@@ -504,6 +663,8 @@ class Layout(QtWidgets.QWidget):
 				self.passwordMerge = conn.layout.txtPassword.text()
 				self.authTypeMerge = conn.layout.cmbAuthType.currentText()
 				self.connected = True
+				self.commitList.customContextMenuRequested.disconnect()
+				self.commitList.customContextMenuRequested.connect(self.openMergeCommitDetailsMenu)
 
 				if self.authTypeMerge == "Windows Authentication":
 					self.connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + self.serverMerge + ";DATABASE=SQLVC;Trusted_Connection=yes;"
@@ -541,12 +702,7 @@ class Layout(QtWidgets.QWidget):
 		indexes = self.commitList.selectedIndexes()
 		if len(indexes) == 0:
 			menu = QtWidgets.QMenu()
-
-			if self.serverMerge == None:
-				server = "remote server"
-			else:
-				server = self.serverMerge
-
+			server = self.serverMerge
 			generate = menu.addAction(self.tr("Merge to " + server))
 			generate.triggered.connect(self.mergeToTarget)
 			menu.exec_(self.commitList.viewport().mapToGlobal(position))
@@ -567,10 +723,21 @@ class Layout(QtWidgets.QWidget):
 
 	def openCommitDetailsMenu(self, position):
 		indexes = self.commitList.selectedIndexes()
+		item = self.commitList.currentItem()
 		if len(indexes) == 0:
 			menu = QtWidgets.QMenu()
-			generate = menu.addAction(self.tr("Compare to other commit"))
-			generate.triggered.connect(self.compareToOtherCommit)
+
+			if self.mode == 'viewcommit':
+				generate = menu.addAction(self.tr("Compare to other commit"))
+				generate.triggered.connect(self.compareToOtherCommit)
+
+			if self.mode == "viewshelve":
+				if 'TABLE' in item.parent().text(0) or 'COLUMN' in item.parent().text(0):
+					generate = menu.addAction(self.tr("Add to workspace"))
+					generate.triggered.connect(self.applyShelveToworkspace)
+				else:
+					generate = menu.addAction(self.tr("Compare latest version"))
+					generate.triggered.connect(self.compareShelfToLates)
 
 			#latestVersion = menu.addAction(self.tr("Compare to latest version"))
 			#latestVersion = menu.addAction(self.tr("Rollback"))
@@ -588,23 +755,57 @@ class Layout(QtWidgets.QWidget):
 
 		globalvars.compareMode = "comparecommit2"
 
+	def applyShelveToworkspace(self, shelveid):
+		try:
+			if self.commitList.selectedIndexes() == []:
+				item = self.commitList.currentItem()
+				itemText = item.text(0)
 
-	def generateCommitObjectList(self, commitid, commitMessage, mode):
+				dbObjType = item.parent()
+				dbObjTypeText = dbObjType.text(0)
+
+				database = dbObjType.parent()
+				databaseText = database.text(0)
+
+				shelveid = self.txtCommitID.text()
+
+				query = get_scripts_apply_shelve(shelveid, databaseText, dbObjTypeText, itemText)
+				print(query)
+				conn = pyodbc.connect(globalvars.connString, autocommit=True)
+				cursor = conn.cursor()
+				cursor.execute(query)
+				getUserObject()
+
+				error_message = "Shelved file has been restored."
+				QtWidgets.QMessageBox.question(globalvars.MainWindow, "Shelve Scripts", error_message,  QtWidgets.QMessageBox.Ok)
+		except Exception as e:
+			saveLog(traceback.format_exc())
+			print("Error creating applying shelve! Please see log file")
+			error_message = "Error creating patch file! Please see log file"
+			QtWidgets.QMessageBox.question(globalvars.MainWindow, "Shelve Scripts", error_message,  QtWidgets.QMessageBox.Ok)
+
+
+
+	def generateDatabaseObjectList(self, commitid, commitMessage, mode):
 		if commitid not in globalvars.openedCommitTabText:
 			self.commitInfo = QtWidgets.QWidget()
+			self.mode = mode
+			if self.mode == "viewcommit":
+				commitTitle = "Commit [" + commitid + "]"
 
-			commitTitle = "Commit [" + commitid + "]"
+			if self.mode == "viewshelve":
+				commitTitle = "Shelved [" + commitid + "]"
 
-			self.commitid = commitid
+			self.dataid = commitid
 
 			self.fileParentTab.addTab(self.commitInfo, commitTitle)
 			self.commitInfo.layout = QtWidgets.QGridLayout(self)
 			self.commitInfo.setLayout(self.commitInfo.layout)
 
-			self.txtCommitID = QtWidgets.QLineEdit(self) #0
-			self.commitInfo.layout.addWidget(self.txtCommitID,0,2,1,1)
-			self.txtCommitID.setReadOnly(True)
-			self.txtCommitID.setText(self.commitid)
+			# self.txtCommitID = QtWidgets.QLineEdit(self) #0
+			# self.commitInfo.layout.addWidget(self.txtCommitID,0,2,1,1)
+			# self.txtCommitID.setReadOnly(True)
+			# self.txtCommitID.setText(self.dataid)
 
 			self.txtCommitMessage = QtWidgets.QPlainTextEdit(self) #0
 			self.commitInfo.layout.addWidget(self.txtCommitMessage,1,0,1,3)
@@ -612,25 +813,42 @@ class Layout(QtWidgets.QWidget):
 			self.txtCommitMessage.setReadOnly(True)
 			self.txtCommitMessage.document().setPlainText(commitMessage)
 
-			self.btnOpenServer = QtWidgets.QPushButton("Apply to...") #0
-			self.commitInfo.layout.addWidget(self.btnOpenServer,0,0,1,1)
-			self.btnOpenServer.clicked.connect(self.generateMergeCommitObjectList)
-			self.btnOpenServer.setMaximumWidth(110)
+			if mode == "viewcommit":
+				self.txtCommitID = QtWidgets.QLineEdit(self) #0
+				self.commitInfo.layout.addWidget(self.txtCommitID,0,2,1,1)
+				self.txtCommitID.setReadOnly(True)
+				self.txtCommitID.setText(self.dataid)
 
-			self.btnCommitMerge = QtWidgets.QPushButton("Commit") #1
-			self.commitInfo.layout.addWidget(self.btnCommitMerge,0,1,1,1)
-			self.btnCommitMerge.clicked.connect(lambda: commitToOtherServer(self))
-			self.btnCommitMerge.setMaximumWidth(100)
-			self.btnCommitMerge.hide()
+				self.btnOpenServer = QtWidgets.QPushButton("Apply to...") #0
+				self.commitInfo.layout.addWidget(self.btnOpenServer,0,0,1,1)
+				self.btnOpenServer.clicked.connect(self.generateMergeCommitObjectList)
+				self.btnOpenServer.setMaximumWidth(110)
 
-			self.btnPatch = QtWidgets.QPushButton("Create Patch") #2
-			self.commitInfo.layout.addWidget(self.btnPatch,0,1,1,1)
-			self.btnPatch.clicked.connect(self.createPatch)
-			self.btnPatch.setMaximumWidth(100)
-			#self.btnOpenServer.clicked.connect(lambda: CommitChanges(self))
+				self.btnCommitMerge = QtWidgets.QPushButton("Commit") #1
+				self.commitInfo.layout.addWidget(self.btnCommitMerge,0,1,1,1)
+				self.btnCommitMerge.clicked.connect(lambda: commitToOtherServer(self))
+				self.btnCommitMerge.setMaximumWidth(100)
+				self.btnCommitMerge.hide()
+
+				self.btnPatch = QtWidgets.QPushButton("Create Patch") #2
+				self.commitInfo.layout.addWidget(self.btnPatch,0,1,1,1)
+				self.btnPatch.clicked.connect(self.createPatch)
+				self.btnPatch.setMaximumWidth(100)
+				#self.btnOpenServer.clicked.connect(lambda: CommitChanges(self))
+
+				self.dataBaseCommits = getCommitDetails(commitid)
+
+			if mode == "viewshelve":
+
+				self.txtCommitID = QtWidgets.QLineEdit(self) #0
+				self.commitInfo.layout.addWidget(self.txtCommitID,0,0,1,1)
+				self.txtCommitID.setReadOnly(True)
+				self.txtCommitID.setText(self.dataid)
+
+				self.dataBaseCommits = getSheveDetails(commitid, globalvars.username)
 
 			self.txtCommitFilter = QtWidgets.QLineEdit(self) #1
-			self.txtCommitFilter.textChanged.connect(self.filterCommitObjects)
+			self.txtCommitFilter.textChanged.connect(lambda:self.filterCommitObjects(mode))
 			self.txtCommitFilter.setPlaceholderText("Filter commit objects") 
 			self.commitInfo.layout.addWidget(self.txtCommitFilter,2,0,1,3)
 
@@ -643,17 +861,15 @@ class Layout(QtWidgets.QWidget):
 			
 
 			self.commitList.clear()
-
-			self.dataBaseCommits = getCommitDetails(commitid)
 			
 			trViewObjects = treeModel()
 			trViewObjects.generateView(self.commitList, self.dataBaseCommits)
 
-			globalvars.openedCommitTabText.append(self.commitid)
+			globalvars.openedCommitTabText.append(self.dataid)
 			globalvars.openedCommitTab.append(self.commitInfo)
 
 		objIndex = globalvars.openedCommitTabText.index(commitid)
-		self.fileParentTab.setCurrentIndex((2 + objIndex))
+		self.fileParentTab.setCurrentIndex((4 + objIndex))
 
 	def initData(self):
 		index = self.fileParentTab.currentIndex()
@@ -663,21 +879,28 @@ class Layout(QtWidgets.QWidget):
 		plaintext = curr_tab.findChildren(QtWidgets.QPlainTextEdit)
 		buttons = curr_tab.findChildren(QtWidgets.QPushButton)
 		
-		if len(line_edit) > 0 and index not in range(2):
+		if len(line_edit) > 0 and index not in range(3):
 			self.txtCommitID = line_edit[0]
 			self.txtCommitFilter = line_edit[1]
 
 			self.commitList = tree[0]
 			self.txtCommitMessage = plaintext[0]
 
-			self.btnOpenServer = buttons[0]
-			self.btnCommitMerge = buttons[1]
-			self.btnPatch = buttons[2]
+			if len(buttons) == 3:
+				self.btnOpenServer = buttons[0]
+				self.btnCommitMerge = buttons[1]
+				self.btnPatch = buttons[2]
 
 
-	def filterCommitObjects(self):
+	def filterCommitObjects(self, mode):
 		self.value = self.txtCommitFilter.text()
-		self.dataBaseCommits = getCommitDetails(self.commitid)
+
+		if mode  == "viewcommit":
+			self.dataBaseCommits = getCommitDetails(self.dataid)
+
+		if mode  == "viewshelve":
+			self.dataBaseCommits = getSheveDetails(self.dataid)
+
 		self.commitList.clear()
 		trViewObjects = treeModel()
 		trViewObjects.generateView(self.commitList, self.dataBaseCommits, self.value)
@@ -694,7 +917,7 @@ class Layout(QtWidgets.QWidget):
 			database = dbObjType.parent()
 			databaseText = database.text(0)
 
-			objScript = generateCommitScript(None, databaseText, dbObjTypeText, itemText, self.commitid)
+			objScript = generateCommitScript(None, databaseText, dbObjTypeText, itemText, self.dataid)
 
 			self.versionList.clear() #clear items first
 			self.lstEdited.document().setPlainText(objScript);
@@ -732,8 +955,8 @@ class Layout(QtWidgets.QWidget):
 
 	def removeObj(self):
 		print("Remove item")
-		if self.objListTab.selectedIndexes() == []:
-			item = self.objListTab.currentItem()
+		# if self.objListTab.selectedIndexes() == []:
+		# 	item = self.objListTab.currentItem()
 			# itemText = item.text(0)
 
 			# dbObjType = item.parent()
@@ -741,10 +964,13 @@ class Layout(QtWidgets.QWidget):
 
 			# database = dbObjType.parent()
 			# databaseText = database.text(0)
-			rowId = item.data(QtCore.Qt.UserRole,0)
+			#rowId = item.data(QtCore.Qt.UserRole,0)
+		arr_id = self.getAllChildren('select')
+
+		rowId = ",".join(arr_id)
 
 			#removeItemToWorkspace(globalvars.username, databaseText, dbObjTypeText, itemText)
-			removeItemToWorkspace(rowId)
+		removeItemToWorkspace(rowId)
 
 
 	def inexclude(self):
@@ -785,6 +1011,25 @@ class Layout(QtWidgets.QWidget):
 
 			downloadToCompare(globalvars.username, databaseText, dbObjTypeText, itemText, databaseText, dbObjTypeText, itemText, 'compareLatest')
 
+			getUserObject()
+
+
+	def compareShelfToLates(self):
+		print("Comparing to latest version")
+		if self.commitList.selectedIndexes() == []:
+			item = self.commitList.currentItem()
+			itemText = item.text(0)
+
+			dbObjType = item.parent()
+			dbObjTypeText = dbObjType.text(0)
+
+			database = dbObjType.parent()
+			databaseText = database.text(0)
+
+			downloadToCompare(globalvars.username, databaseText, dbObjTypeText, itemText, databaseText, dbObjTypeText, itemText, 'compareShelfLatest', self.txtCommitID.text())
+
+			getUserObject()
+
 	def generateObjectScript(self):
 		print("Viewing script info")
 		if self.objListTab.selectedIndexes() == []:
@@ -802,6 +1047,8 @@ class Layout(QtWidgets.QWidget):
 
 			latest = " ("+globalvars.username+"'s latest version)"
 
+			objName = ".".join([databaseText, itemText])
+
 			self.versionList.clear() #clear items first
 			for version in versionList: #iterate
 				#latest by user flag
@@ -816,6 +1063,7 @@ class Layout(QtWidgets.QWidget):
 				self.versionList.addItem(item)
 
 			self.lstEdited.document().setPlainText(objScript);
+			self.contParentTab.setTabText(0, objName)
 
 
 if __name__ == '__main__':

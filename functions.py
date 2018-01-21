@@ -14,6 +14,7 @@ import decimal
 import base64
 import uuid
 import traceback
+import keyring
 
 
 from queries import *
@@ -24,6 +25,7 @@ def refreshConn():
 	if globalvars.server != None:
 		getUserObject()
 		getChangesets()
+		getShelve()
 
 
 def EventEmmitter(index):
@@ -99,6 +101,7 @@ def OpenConnection(connectWindow):
 				globalvars.MainWindow.parent().setSQLWindowTitle()
 				getUserObject()
 				getChangesets()
+				getShelve()
 
 
 			connectWindow.btnCancel.click()
@@ -244,7 +247,7 @@ def saveLog(message):
 	log_obj.close()
 
 
-def saveConfigurations(path, connWin = None):
+def saveConfigurations(path, connWin = None, mode = 'save'):
 
 	if os.path.exists(path):
 		root = ET.parse(path).getroot()
@@ -277,13 +280,26 @@ def saveConfigurations(path, connWin = None):
 				instance.set("selected", "1")
 				instance.set("authentication", str(connWin.cmbAuthType.currentText()))
 				instance.set("user", str(connWin.txtUserName.text()))
-				instance.set("password", "")
+				instance.set("password", ("1" if connWin.chkRemember.isChecked() else "0"))
+
+				#save password to keyring
+				if str(connWin.cmbAuthType.currentText()) == "SQL Authentication":
+					passKey = str(connWin.txtPassword.text()) if connWin.chkRemember.isChecked() else ""
+					password(str(connWin.cmbServers.currentText()), str(connWin.txtUserName.text()), passKey)
 			else:
 				instance.set("selected", "0")
 			#print(instance.attrib["instance"])
 
-	tree = ET.ElementTree(root)
-	tree.write(path)
+	if mode == 'save':
+		tree = ET.ElementTree(root)
+		tree.write(path)
+
+def password(instance, username, password = None):
+	if password is not None:
+		keyring.set_password(instance, username, password)
+	else:
+		return keyring.get_password(instance, username)
+
 
 def readConnConfiguration(path, connWin = None):
 	if os.path.exists(path):
@@ -297,6 +313,11 @@ def readConnConfiguration(path, connWin = None):
 
 			if instance.attrib["selected"] == "1":
 
+				#retrieve password from keyring
+				txtPassword = ""
+				if instance.attrib["authentication"] == "SQL Authentication":
+					txtPassword = password(instance.attrib["instance"], instance.attrib["user"])
+
 				serverIndex = connWin.layout.cmbServers.findText(instance.attrib["instance"])
 				connWin.layout.cmbServers.setCurrentIndex(serverIndex)
 
@@ -304,7 +325,12 @@ def readConnConfiguration(path, connWin = None):
 				connWin.layout.cmbAuthType.setCurrentIndex(authIndex)
 
 				connWin.layout.txtUserName.setText(instance.attrib["user"])
-				connWin.layout.txtPassword.setText("")
+				connWin.layout.txtPassword.setText(txtPassword)
+
+				if instance.attrib["password"] == "1":
+					connWin.layout.chkRemember.setChecked(1)
+				else:
+					connWin.layout.chkRemember.setChecked(0)
 
 			cmbIndex = cmbIndex + 1
 
@@ -314,6 +340,8 @@ def readConnConfiguration(path, connWin = None):
 		connWin.layout.txtUserName.setFocus()
 	elif connWin.layout.txtPassword.text() == "":
 		connWin.layout.txtPassword.setFocus()
+	else:
+		connWin.layout.btnOpen.setFocus()
 
 def getUserObject():
 
@@ -373,6 +401,31 @@ def generateObjectScript(user, database, objType, objName, rowId = None):
 		else:
 			query = get_latest_script_by_rowid(str(rowId))
 
+
+		if objType == 'TABLE':
+			if globalvars.authType == "Windows Authentication":
+				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + globalvars.server + ";DATABASE=" + database + ";Trusted_Connection=yes;"
+			else:
+				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + globalvars.server + ";DATABASE=" + database + ";UID=" + globalvars.username + ";PWD=" + globalvars.password
+		else:
+			connString = globalvars.connString
+
+		conn = pyodbc.connect(connString)
+		cursor = conn.cursor()
+		cursor.execute(query)
+		rows = cursor.fetchall()
+		for row in rows:
+			viewObj = row[0]
+
+	return viewObj
+
+def generateShelfScript(user, database, objType, objName, rowId = None):
+
+	viewObj = ""
+
+	if globalvars.engine == "Microsoft SQL Server":
+
+		query = get_shelfitem_by_rowid(database, objType, objName, str(rowId))
 
 		if objType == 'TABLE':
 			if globalvars.authType == "Windows Authentication":
@@ -530,6 +583,16 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 			
 			targetDB = db2
 			name_preserve = objName2 + "_SERVER("+str(server2.replace("\\","-"))+").sql"
+
+		elif compareType == "compareShelfLatest":
+			name1 = compare_directory + objName1 + "_LATEST.sql"
+			name2 = compare_directory + objName2 + "_SHELF("+str(rowId1)+").sql"
+
+			obj1 = generateShelfScript(user, db1, objType1, objName1, rowId1)
+			obj2 = generateObjectScript('', db1, objType1, objName1) #latest version of the script
+
+			targetDB = db2
+			name_preserve = objName2 + "_SHELF("+str(rowId2)+").sql"
 
 	c1 = open(name1, "w")
 	c1.write(obj1.replace("\r\n","\n"))
@@ -866,6 +929,78 @@ def CommitChanges(MainWindow, flag=''):
 		error_message = "Error commiting file. Please see log file for error."
 		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", error_message,  QtWidgets.QMessageBox.Ok)
 
+def ShelveChanges(MainWindow, flag=''):
+	try:
+		treeView = MainWindow.objListTab
+		item = treeView.invisibleRootItem()
+		selected_items = select_item(item)
+		
+		if len(selected_items) == 0:
+			shelve_message = "No item selected to shelve."
+			reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", shelve_message,  QtWidgets.QMessageBox.Ok)
+		else:
+			shelve_message = "You are about to shelve changes in database. Continue?"
+			reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", shelve_message,  QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Cancel)
+			conflicts = []
+
+			if reply == QtWidgets.QMessageBox.Ok:
+				#check if commit message is empty
+				text = str(globalvars.MainWindow.commitMessage.toPlainText())
+				if text.strip()  == "":
+					shelve_message = "Empty shelve message"
+					reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", shelve_message,  QtWidgets.QMessageBox.Ok)
+					globalvars.MainWindow.commitMessage.setFocus()
+				else:
+					commitID = ""
+
+					if globalvars.engine == "Microsoft SQL Server":
+
+						shelveID = "shelve-" + globalvars.server.replace("\\","-")
+
+						rowId = ",".join(selected_items)
+
+						query1 = """insert into [SQLVC].[dbo].[Shelve_hdr](ShelveID, LoginName, ShelveMessage, ShelveDate)
+										values('""" + shelveID + """','""" + globalvars.username + """','""" + text + """',GETDATE())"""
+
+						query1_1 = "select @@IDENTITY"
+
+						conn = pyodbc.connect(globalvars.connString, autocommit=True)
+
+						cursor = conn.cursor()
+						cursor.execute(query1)
+						ident = cursor.execute(query1_1)
+
+						for i in ident:
+							shelveID = shelveID + "-" + str(i[0])
+
+
+						query2 = save_shelve_detail(shelveID, rowId)
+
+
+						print("shelving items")
+						cursor.execute(query2)
+
+						query_delete = """delete from [SQLVC].[dbo].[UserWorkspace] where RowId in (""" + rowId + """);"""
+						
+						print("deleting shelved item in workspace")
+						cursor.execute(query_delete)
+
+						conn.close()
+
+
+					shelve_message = "Object has been shelved. Shelve ID " + shelveID + " has been created."
+					reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", shelve_message,  QtWidgets.QMessageBox.Ok)
+					globalvars.MainWindow.commitMessage.document().setPlainText("")
+					#remove items
+					getUserObject()
+					getChangesets()
+					getShelve()
+
+	except Exception as e:
+		saveLog(traceback.format_exc())
+		error_message = "Error commiting file. Please see log file for error."
+		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commit Changes", error_message,  QtWidgets.QMessageBox.Ok)
+
 
 def getChangesets():
 	globalvars.MainWindow.lstCommitsModel.removeRows(0,  globalvars.MainWindow.lstCommitsModel.rowCount())
@@ -884,6 +1019,22 @@ def getChangesets():
 
 		globalvars.MainWindow.addCommit(globalvars.MainWindow.lstCommitsModel, commitID, user, commitMessaage,date)
 
+
+def getShelve():
+	globalvars.MainWindow.lstShelveModel.removeRows(0,  globalvars.MainWindow.lstShelveModel.rowCount())
+	if globalvars.engine == "Microsoft SQL Server":
+		conn = pyodbc.connect(globalvars.connString, autocommit=True)
+		cursor = conn.cursor()
+		shelves = cursor.execute("select RowId, ShelveID, ShelveMessage,LoginName,ShelveDate  from [SQLVC].[dbo].[shelve_hdr] order by RowId asc")
+
+	for shelve in shelves:
+		shelveID = str(shelve[1]) + "-" + str(shelve[0])
+		user = str(shelve[3])
+		shelveMessaage = str(shelve[2])
+		date = str(shelve[4])
+
+		globalvars.MainWindow.addShelve(globalvars.MainWindow.lstShelveModel, shelveID, user, shelveMessaage,date)
+
 def removeItemToWorkspace(rowId):
 	try:
 
@@ -892,7 +1043,7 @@ def removeItemToWorkspace(rowId):
 
 		if reply == QtWidgets.QMessageBox.Ok:
 			if globalvars.engine == "Microsoft SQL Server":
-				query = "delete from [SQLVC].[dbo].[UserWorkspace] where RowID='" + str(rowId) + "'"
+				query = "delete from [SQLVC].[dbo].[UserWorkspace] where RowID in (" + str(rowId) + ")"
 				conn = pyodbc.connect(globalvars.connString, autocommit=True)
 				cursor = conn.cursor()
 				commits = cursor.execute(query)
@@ -1027,7 +1178,22 @@ def getCommitDetails(commitid):
 	except Exception as e:
 		saveLog(traceback.format_exc())
 		error_message = "Error getting commit details. Please see log file for details."
-		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Remove Item", error_message,  QtWidgets.QMessageBox.Ok)
+		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Commits", error_message,  QtWidgets.QMessageBox.Ok)
+
+
+def getSheveDetails(shelveid, userid):
+	try:
+		if globalvars.engine == "Microsoft SQL Server":
+			query = getShelvedDetails(shelveid, userid)
+			conn = pyodbc.connect(globalvars.connString, autocommit=True)
+			cursor = conn.cursor()
+			data = cursor.execute(query)
+			return data
+
+	except Exception as e:
+		saveLog(traceback.format_exc())
+		error_message = "Error getting shelf details. Please see log file for details."
+		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Shelf", error_message,  QtWidgets.QMessageBox.Ok)
 
 def encode(key, clear):
     enc = []

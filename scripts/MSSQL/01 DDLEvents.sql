@@ -45,3 +45,22 @@ CREATE TABLE [dbo].[Commits_dtl](
 	[ObjectType] [varchar](max) NULL,
 	[ObjectDDL] [varchar](max) NULL
 ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+
+CREATE TABLE [dbo].[Shelve_hdr](
+	[RowID] [int] IDENTITY(1,1) NOT NULL,
+	[ShelveID] [varchar](max) NULL,
+	[LoginName] [varchar](max) NULL,
+	[ShelveDate] [datetime] default GETDATE(),
+	[ShelveMessage] [varchar](max) NULL,
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+
+CREATE TABLE [dbo].[Shelve_dtl](
+	[RowID] [int] IDENTITY(1,1) NOT NULL,
+	[ShelveID] [varchar](max) NULL,
+	[DatabaseName] [varchar](max) NULL,
+	[SchemaName] [varchar](max) NULL,
+	[ObjectName] [varchar](max) NULL,
+	[LoginName] [varchar](max) NULL,
+	[ObjectType] [varchar](max) NULL,
+	[ObjectDDL] [varchar](max) NULL
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]

@@ -94,12 +94,15 @@ class ConnectLayout(QtWidgets.QWidget):
 		self.txtPassword.returnPressed.connect(lambda : OpenConnection(self))
 		grid_layout.addWidget(self.txtPassword, 9, 0, 1, 3)
 
+		self.chkRemember = QtWidgets.QCheckBox("Remeber password")
+		grid_layout.addWidget(self.chkRemember, 10, 0, 1, 3)
+
 		self.btnOpen = QtWidgets.QPushButton('Open')
-		grid_layout.addWidget(self.btnOpen, 10, 1)
+		grid_layout.addWidget(self.btnOpen, 11, 1)
 		self.btnOpen.clicked.connect(lambda : OpenConnection(self))
 
 		self.btnCancel = QtWidgets.QPushButton('Cancel')
-		grid_layout.addWidget(self.btnCancel, 10, 2)
+		grid_layout.addWidget(self.btnCancel, 11, 2)
 		self.btnCancel.clicked.connect(parent.close)
 
 		self.setDisplayUser(False)
@@ -140,6 +143,8 @@ class ConnectLayout(QtWidgets.QWidget):
 			self.txtUserName.setText(domain + "\\" + user)
 		else:
 			self.txtUserName.setText("")
+
+		self.txtPassword.setText("")
 
 
 

@@ -11,9 +11,13 @@ objListTab = None
 sett = None
 compareObj = None
 masterPassword = "P@ssw0rd"
+
 openedCommitTab = []
 openedCommitTabText = []
-version = "alpha 1.5"
+openedDetailsTab = []
+openedDetailsTabID = []
+
+version = "alpha 1.6"
 darkmode = False
 connectionMode = 'connectserver'
 serverTypeMerge = None
