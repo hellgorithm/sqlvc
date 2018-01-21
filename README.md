@@ -29,8 +29,8 @@ There are still features that are not yet implemented
 https://github.com/hellgorithm/sqlvc
 
 ### Binary 
-[Windows 64bit](https://drive.google.com/file/d/1E3BiA0tsGWdpPQREK9vIBMXZRdcs1NM7/view?usp=sharing)
+[Windows 64bit](https://drive.google.com/file/d/1fRU-aZSBNvY8WrQn7El1HAxk0X5GoC98/view?usp=sharing)
 
-[Linux 64bit](https://drive.google.com/file/d/1qAgK_KPJvBcqbUjitTDoY2_1hUn7995Y/view?usp=sharing)
+[Linux 64bit](https://drive.google.com/file/d/1nRx1WWXIVgmFFrxhbeqBC3Y7TQTRquIc/view?usp=sharing)
 
 
