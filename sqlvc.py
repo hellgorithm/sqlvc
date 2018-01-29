@@ -1,5 +1,5 @@
 import globalvars
-import sys, os, getpass, platform
+import sys, os, getpass
 from PyQt5 import QtWidgets, QtGui, QtCore
 import xml.etree.cElementTree as ET
 from treeModel import treeModel
@@ -55,9 +55,13 @@ class MainWindow(QtWidgets.QMainWindow):
 		refresh_action.triggered.connect(self.refreshConn)
 		refresh_action.setShortcut(QtGui.QKeySequence("Ctrl+R"))
 
+
+		home = expanduser("~")
+		path = home + "/sqlvc/logs"
+
 		open_log = QtWidgets.QAction('Open &Logs', self)
 		file_menu.addAction(open_log)
-		open_log.triggered.connect(self.openLogFolder)
+		open_log.triggered.connect(lambda:openLogFolder(path))
 		open_log.setShortcut(QtGui.QKeySequence("Ctrl+L"))
 
 		preference_action = QtWidgets.QAction('&Preferences', self)
@@ -183,16 +187,16 @@ class MainWindow(QtWidgets.QMainWindow):
 		frameGm.moveCenter(centerPoint)
 		self.move(frameGm.topLeft())
 
-	def openLogFolder(self):
-		home = expanduser("~")
-		path = home + "/sqlvc/logs"
+	# def openLogFolder(self, path):
+	# 	#home = expanduser("~")
+	# 	#path = home + "/sqlvc/logs"
 
-		if platform.system() == "Windows":
-			os.startfile(path)
-		elif platform.system() == "Darwin":
-			subprocess.Popen(["open", path])
-		else:
-			subprocess.Popen(["xdg-open", path])
+	# 	if platform.system() == "Windows":
+	# 		os.startfile(path)
+	# 	elif platform.system() == "Darwin":
+	# 		subprocess.Popen(["open", path])
+	# 	else:
+	# 		subprocess.Popen(["xdg-open", path])
 
 class Layout(QtWidgets.QWidget):
 
@@ -700,12 +704,39 @@ class Layout(QtWidgets.QWidget):
 
 	def openMergeCommitDetailsMenu(self, position):
 		indexes = self.commitList.selectedIndexes()
+		item = self.commitList.currentItem()
+
 		if len(indexes) == 0:
 			menu = QtWidgets.QMenu()
 			server = self.serverMerge
 			generate = menu.addAction(self.tr("Merge to " + server))
 			generate.triggered.connect(self.mergeToTarget)
 			menu.exec_(self.commitList.viewport().mapToGlobal(position))
+		else:
+			if item.parent() != None and item.parent().parent() == None:
+				menu = QtWidgets.QMenu()
+				#map = menu.addAction(self.tr("Map to..."))
+
+				#submenu = QtWidgets.QMenu()
+				map = menu.addMenu("Map to")
+
+				#loop
+				databases = getDatabaseList()
+
+				for db in databases:
+					db1 = QtWidgets.QAction(db[0], self)
+					db1.triggered.connect(lambda:self.mapToTarget(db[0], item))
+					map.addAction(db1)
+
+				menu.addMenu(map)
+
+				menu.exec_(self.commitList.viewport().mapToGlobal(position))
+
+	def mapToTarget(self, nText, item):
+
+		print(item.data(QtCore.Qt.UserRole, 0))
+		item.setText(0, nText)
+
 
 	def mergeToTarget(self):
 		if self.commitList.selectedIndexes() == []:
@@ -716,9 +747,10 @@ class Layout(QtWidgets.QWidget):
 			dbObjTypeText = dbObjType.text(0)
 
 			database = dbObjType.parent()
-			databaseText = database.text(0)
+			destinationDatabase = database.text(0)
+			sourceDatabase = database.data(QtCore.Qt.UserRole, 0)
 			
-			downloadToCompare(globalvars.username, databaseText, dbObjTypeText, itemText, databaseText, dbObjTypeText, itemText, 'compareToServer', self.txtCommitID.text(), '', '', self.serverMerge, '', self.usernameMerge, '', self.passwordMerge, '', self.authTypeMerge)
+			downloadToCompare(globalvars.username, sourceDatabase, dbObjTypeText, itemText, destinationDatabase, dbObjTypeText, itemText, 'compareToServer', self.txtCommitID.text(), '', '', self.serverMerge, '', self.usernameMerge, '', self.passwordMerge, '', self.authTypeMerge)
 
 
 	def openCommitDetailsMenu(self, position):
@@ -934,7 +966,7 @@ class Layout(QtWidgets.QWidget):
 				files = cursor.execute(query)
 
 				for file in files:
-					subfolder = str(folder) + "/" + str(file[2]) + "/"
+					subfolder = str(folder) + "/" + str(file[3]) + "/" + str(file[2]) + "/"
 
 					if not os.path.isdir(subfolder):
 						os.makedirs(subfolder)
@@ -946,6 +978,8 @@ class Layout(QtWidgets.QWidget):
 
 				error_message = "Patch file has been successfully created"
 				QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", error_message,  QtWidgets.QMessageBox.Ok)
+
+				openLogFolder(folder)
 
 		except Exception as e:
 			saveLog(traceback.format_exc())

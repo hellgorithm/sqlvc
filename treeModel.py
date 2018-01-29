@@ -31,6 +31,7 @@ class treeModel():
 
                 db = QtWidgets.QTreeWidgetItem(server)
                 db.setText(0, str(database))
+                db.setData(QtCore.Qt.UserRole, 0, str(database))
                 db.setExpanded(True)
                 #db.setIcon(0,QIcon("your icon path or file name "));
 

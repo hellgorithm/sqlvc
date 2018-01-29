@@ -1,5 +1,5 @@
 import globalvars
-import os
+import os, platform
 import xml.etree.cElementTree as ET
 from PyQt5 import QtWidgets, QtGui, QtCore
 import pyodbc
@@ -484,10 +484,18 @@ def generateRemoteScript(server, auth, serverUser, serverPass, database, objType
 		return viewObj
 
 	except Exception as e:
-		saveLog(traceback.format_exc())
-		error_message = "Error fetching remote script. Please see log file"
-		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Apply Merged", error_message,  QtWidgets.QMessageBox.Ok)
-		return ""
+		# saveLog(traceback.format_exc())
+		# error_message = "Error fetching remote script. Please see log file"
+		# reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Apply Merged", error_message,  QtWidgets.QMessageBox.Ok)
+
+		err_msg = str(traceback.format_exc())
+		saveLog(err_msg)
+
+		if "Cannot open database" in err_msg:
+			error_message = "Access denied, database does not exist. Check server or map to destination database. See log file for more info."
+			reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Error Applying Merge", error_message,  QtWidgets.QMessageBox.Ok)
+
+			return "ERROR GENERATING SCRIPT, SEE LOG FILE!!!"
 
 
 def generateVersionList(database, objType, objName):
@@ -662,7 +670,11 @@ def downloadToCompare(user, db1, objType1, objName1, db2, objType2, objName2, co
 					if compareType == 'compareToServer':
 						checkForApply(toApply, targetDB, auth2, server2, serverUser2, serverPass2, objType2)
 					else:
-						checkForApply(toApply,targetDB, '', '', '', '', objType2)
+						#fix authentication error
+						if auth1 == '':
+							auth1 = globalvars.authType
+
+						checkForApply(toApply, targetDB, auth1, '', '', '', objType2)
 
 				if reply == 1:
 					delete = False
@@ -1227,7 +1239,33 @@ def getCompiledScripts(id):
 		saveLog(traceback.format_exc())
 		error_message = "Error compiling scripts. Please see log file for details."
 		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Remove Item", error_message,  QtWidgets.QMessageBox.Ok)
-			
+
+
+def openLogFolder(path):
+	#home = expanduser("~")
+	#path = home + "/sqlvc/logs"
+
+	if platform.system() == "Windows":
+		os.startfile(path)
+	elif platform.system() == "Darwin":
+		subprocess.Popen(["open", path])
+	else:
+		subprocess.Popen(["xdg-open", path])
+
+def getDatabaseList():
+	try:
+		if globalvars.engine == "Microsoft SQL Server":
+			query = getDatabases()
+			conn = pyodbc.connect(globalvars.connString, autocommit=True)
+			cursor = conn.cursor()
+			data = cursor.execute(query)
+			return data
+
+
+	except Exception as e:
+		saveLog(traceback.format_exc())
+		error_message = "Getting database list. Please see log file for details."
+		reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Database List", error_message,  QtWidgets.QMessageBox.Ok)
 
 
 

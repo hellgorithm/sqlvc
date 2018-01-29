@@ -47,7 +47,7 @@ def get_shelfitem_by_rowid(database, objectType, objectName, shelveid):
 
 
 def get_scripts_by_commit(commitid):
-	return """SELECT ObjectName, ObjectDDL, ObjectType from [SQLVC].[dbo].[Commits_dtl] where CommitID='""" + str(commitid) + """'"""
+	return """SELECT ObjectName, ObjectDDL, ObjectType, DatabaseName from [SQLVC].[dbo].[Commits_dtl] where CommitID='""" + str(commitid) + """'"""
 
 def get_scripts_apply_shelve(shelveid, database, objectType, objectName):
 	return """insert into dbo.UserWorkspace(DatabaseName, SchemaName, ObjectName, LoginName, ObjectType)
@@ -95,3 +95,6 @@ def checkConflict(rowId):
 
 def getShelvedDetails(shelveid, userid = ''):
 	return "select RowID, DatabaseName, SchemaName, ObjectName, LoginName, ObjectType from [SQLVC].[dbo].[Shelve_dtl] where ShelveID='" + shelveid + "' and LoginName='"+userid+"' order by DatabaseName, ObjectType, ObjectName"
+
+def getDatabases():
+	return "select name from sys.databases where HAS_DBACCESS(name) = 1"

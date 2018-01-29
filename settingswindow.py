@@ -11,7 +11,7 @@ class AboutWindow(QtWidgets.QMainWindow):
 
 		self.layout = AboutLayout(parent=self)
 		self.setWindowTitle("About SQLVC")
-		self.setWindowIcon(QtGui.QIcon('icons/sqlvc-icon.png'))
+		self.setWindowIcon(QtGui.QIcon(globalvars.icon))
 		self.setCentralWidget(self.layout)
 		self.resize(500, 130)
 		self.setFixedSize(self.size())
@@ -52,7 +52,7 @@ class SettingsWindow(QtWidgets.QMainWindow):
 
 		self.layout = SettingsLayout(parent=self)
 		self.setWindowTitle("Settings")
-		self.setWindowIcon(QtGui.QIcon('icons/sqlvc-icon.png'))
+		self.setWindowIcon(QtGui.QIcon(globalvars.icon))
 		self.setCentralWidget(self.layout)
 		self.resize(250, 130)
 		# self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)

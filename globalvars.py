@@ -1,3 +1,5 @@
+import os
+
 engine = "Microsoft SQL Server"
 server = None
 database = None
@@ -25,6 +27,7 @@ serverMerge = None
 usernameMerge = None
 passwordMerge = None
 authTypeMerge = None
+icon = os.path.join("icons","sqlvc-icon.png")
 version_url = "http://hellgorithm.github.io/sqlvc_version.txt"
 dl_url = "https://github.com/hellgorithm/sqlvc#binary"
 

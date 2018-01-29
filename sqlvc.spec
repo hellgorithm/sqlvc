@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['sqlvc.py'],
-             pathex=['/media/hellgorithm/BACKUP/sqlvc'],
+             pathex=['/media/hellgorithm/BACKUP/sqlvc_builda_a_1_6'],
              binaries=[],
              datas=[],
              hiddenimports=[],
@@ -23,7 +23,7 @@ exe = EXE(pyz,
           debug=False,
           strip=False,
           upx=True,
-          console=False )
+          console=False , icon='iconssqlvc-icon.ico')
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,
