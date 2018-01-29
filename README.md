@@ -11,6 +11,7 @@ Cross platform version control for SQL server.
 * Commit database changes
 * Apply commit to other server as long as the target server is SQLVC enabled
 * Commit the applied changes in other server
+* Save and restore workspace though shelf
 
 
 There are still features that are not yet implemented
@@ -29,8 +30,8 @@ There are still features that are not yet implemented
 https://github.com/hellgorithm/sqlvc
 
 ### Binary 
-[Windows 64bit](https://drive.google.com/file/d/1fRU-aZSBNvY8WrQn7El1HAxk0X5GoC98/view?usp=sharing)
+[Windows 64bit](https://drive.google.com/file/d/1NL4hp4rmapRWGzOpnqRHJjPOEQgATO8J/view?usp=sharing)
 
-[Linux 64bit](https://drive.google.com/file/d/1nRx1WWXIVgmFFrxhbeqBC3Y7TQTRquIc/view?usp=sharing)
+[Linux 64bit](https://drive.google.com/file/d/1TIMGGXTpLzzG5xpE06B2cz_S5_DTOObM/view?usp=sharing)
 
 
