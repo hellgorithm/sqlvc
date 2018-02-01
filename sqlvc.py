@@ -13,6 +13,8 @@ from settingswindow import *
 from connectwindow import *
 from queries import *
 import webbrowser
+import syntax
+from functools import partial
 
 try:
     import urllib.request as urllib2
@@ -376,8 +378,12 @@ class Layout(QtWidgets.QWidget):
 
 	def viewHistoryDetail(self):
 		self.lstEdited = QtWidgets.QPlainTextEdit(self)
+		font = QtGui.QFont("Monaco", 11)
+		self.lstEdited.setFont(font)
 		self.lstEdited.setReadOnly(True)
 		self.lstEdited.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
+		#highlight = syntax.PythonHighlighter(self.lstEdited.document())
+		#self.lstEdited.textChanged.connect(lambda:syntax.PythonHighlighter(self.lstEdited.document()))
 
 		self.contentTab = QtWidgets.QWidget()
 		self.contentTab.layout = QtWidgets.QGridLayout(self)
@@ -403,9 +409,10 @@ class Layout(QtWidgets.QWidget):
 	def removeCommitTab(self, index):
 		self.fileParentTab.removeTab(index)
 		
-		tabArrIndex = (index - 4)
+		tabArrIndex = (index - globalvars.tabOffset)
 		del globalvars.openedCommitTab[tabArrIndex]
 		del globalvars.openedCommitTabText[tabArrIndex]
+		del globalvars.openedCommitTabType[tabArrIndex]
 
 	#commit table creator
 	def createCommitModel(self,parent):
@@ -446,7 +453,8 @@ class Layout(QtWidgets.QWidget):
 	def getItemVersionInfo(self):
 		rowId = self.versionList.selectedItems()[0].data(QtCore.Qt.UserRole)
 		script = generateObjectScript(None, None, None, None, rowId)
-		self.lstEdited.document().setPlainText(script);
+		#self.lstEdited.setPlainText(script);
+		self.populateEditInfo(script)
 		self.contParentTab.setCurrentIndex(0)
 
 	def openMenu(self, position):
@@ -632,6 +640,8 @@ class Layout(QtWidgets.QWidget):
 			self.txtCommitMessage.setReadOnly(True)
 
 			self.connected = False
+			self.TabConfig('set', self.tabIndex, self.serverTypeMerge, self.serverMerge, self.usernameMerge, self.passwordMerge, self.authTypeMerge, self.connected)
+
 		else:
 
 			conn.layout.btnOpen.disconnect()
@@ -661,12 +671,19 @@ class Layout(QtWidgets.QWidget):
 				saveConfigurations(configPath, conn.layout, 'nosave')
 
 				globalvars.engine = serverType
+
+				#selected tab
+				self.tabIndex = self.fileParentTab.currentIndex()
+
 				self.serverTypeMerge = conn.layout.cmbDbase.currentText()
 				self.serverMerge = conn.layout.cmbServers.currentText()
 				self.usernameMerge = conn.layout.txtUserName.text()
 				self.passwordMerge = conn.layout.txtPassword.text()
 				self.authTypeMerge = conn.layout.cmbAuthType.currentText()
 				self.connected = True
+				
+				self.TabConfig('set', self.tabIndex, self.serverTypeMerge, self.serverMerge, self.usernameMerge, self.passwordMerge, self.authTypeMerge, self.connected)
+
 				self.commitList.customContextMenuRequested.disconnect()
 				self.commitList.customContextMenuRequested.connect(self.openMergeCommitDetailsMenu)
 
@@ -702,6 +719,27 @@ class Layout(QtWidgets.QWidget):
 			saveLog(traceback.format_exc())
 			print("Connection error occured for merge")
 
+	def TabConfig(self, mode = '', tabIndex = '', serverTypeMerge = '', serverMerge = '', usernameMerge = '', passwordMerge = '', authTypeMerge = '', connected = ''):
+		try:
+			if mode == 'get':
+				return globalvars.openedCommitTab[tabIndex - globalvars.tabOffset]
+			else:
+				tabData = {
+						"serverTypeMerge" : serverTypeMerge,
+						"serverMerge" : serverMerge,
+						"usernameMerge" : usernameMerge,
+						"passwordMerge" : passwordMerge,
+						"authTypeMerge" : authTypeMerge,
+						"connected" : connected
+					}
+				if tabIndex != '':
+					globalvars.openedCommitTab[tabIndex - globalvars.tabOffset] = tabData
+				else:
+					globalvars.openedCommitTab.append(tabData)
+
+		except Exception as e:
+			print("Initialize tab content")
+
 	def openMergeCommitDetailsMenu(self, position):
 		indexes = self.commitList.selectedIndexes()
 		item = self.commitList.currentItem()
@@ -721,20 +759,22 @@ class Layout(QtWidgets.QWidget):
 				map = menu.addMenu("Map to")
 
 				#loop
-				databases = getDatabaseList()
+				databases = getDatabaseList(self.serverTypeMerge, self.serverMerge, self.authTypeMerge, self.usernameMerge, self.passwordMerge)
 
 				for db in databases:
-					db1 = QtWidgets.QAction(db[0], self)
-					db1.triggered.connect(lambda:self.mapToTarget(db[0], item))
-					map.addAction(db1)
+					dbaseName = db[0]
+					db_menu = QtWidgets.QAction(dbaseName, self)
+					db_menu.setData(dbaseName)
+					db_menu.triggered.connect(partial(self.mapToTarget, db_menu))
+					map.addAction(db_menu)
 
 				menu.addMenu(map)
 
 				menu.exec_(self.commitList.viewport().mapToGlobal(position))
 
-	def mapToTarget(self, nText, item):
-
-		print(item.data(QtCore.Qt.UserRole, 0))
+	def mapToTarget(self, menu):
+		item = self.commitList.currentItem()
+		nText = menu.data()
 		item.setText(0, nText)
 
 
@@ -821,6 +861,7 @@ class Layout(QtWidgets.QWidget):
 	def generateDatabaseObjectList(self, commitid, commitMessage, mode):
 		if commitid not in globalvars.openedCommitTabText:
 			self.commitInfo = QtWidgets.QWidget()
+
 			self.mode = mode
 			if self.mode == "viewcommit":
 				commitTitle = "Commit [" + commitid + "]"
@@ -898,7 +939,9 @@ class Layout(QtWidgets.QWidget):
 			trViewObjects.generateView(self.commitList, self.dataBaseCommits)
 
 			globalvars.openedCommitTabText.append(self.dataid)
-			globalvars.openedCommitTab.append(self.commitInfo)
+			#globalvars.openedCommitTab.append(self.commitInfo)
+			self.TabConfig('set', '','','','','','','')
+			globalvars.openedCommitTabType.append(self.mode)
 
 		objIndex = globalvars.openedCommitTabText.index(commitid)
 		self.fileParentTab.setCurrentIndex((4 + objIndex))
@@ -910,18 +953,42 @@ class Layout(QtWidgets.QWidget):
 		tree = curr_tab.findChildren(QtWidgets.QTreeWidget)
 		plaintext = curr_tab.findChildren(QtWidgets.QPlainTextEdit)
 		buttons = curr_tab.findChildren(QtWidgets.QPushButton)
+		tabConf = self.TabConfig('get', index)
+		# print("<<<<<<<<<<<<<<<")
+		# print(self.TabConfig(index))
+
 		
-		if len(line_edit) > 0 and index not in range(3):
+		if len(line_edit) > 0 and index not in range(4):
 			self.txtCommitID = line_edit[0]
+
 			self.txtCommitFilter = line_edit[1]
 
 			self.commitList = tree[0]
+
+			self.mode = globalvars.openedCommitTabType[index - globalvars.tabOffset]
+
+			self.commitList.customContextMenuRequested.disconnect()
+
+			if tabConf["connected"] == True:
+				self.serverTypeMerge = tabConf["serverTypeMerge"]  
+				self.serverMerge = tabConf["serverMerge"]  
+				self.usernameMerge = tabConf["usernameMerge"]  
+				self.passwordMerge = tabConf["passwordMerge"]  
+				self.authTypeMerge = tabConf["authTypeMerge"]  
+				self.connected = tabConf["connected"] 
+				self.commitList.customContextMenuRequested.connect(self.openMergeCommitDetailsMenu)
+			else:
+				self.commitList.customContextMenuRequested.connect(self.openCommitDetailsMenu)
+
 			self.txtCommitMessage = plaintext[0]
 
 			if len(buttons) == 3:
 				self.btnOpenServer = buttons[0]
 				self.btnCommitMerge = buttons[1]
 				self.btnPatch = buttons[2]
+
+			#other data
+			self.dataid = self.txtCommitID.text()
 
 
 	def filterCommitObjects(self, mode):
@@ -931,7 +998,7 @@ class Layout(QtWidgets.QWidget):
 			self.dataBaseCommits = getCommitDetails(self.dataid)
 
 		if mode  == "viewshelve":
-			self.dataBaseCommits = getSheveDetails(self.dataid)
+			self.dataBaseCommits = getSheveDetails(self.dataid, globalvars.username)
 
 		self.commitList.clear()
 		trViewObjects = treeModel()
@@ -949,10 +1016,19 @@ class Layout(QtWidgets.QWidget):
 			database = dbObjType.parent()
 			databaseText = database.text(0)
 
-			objScript = generateCommitScript(None, databaseText, dbObjTypeText, itemText, self.dataid)
+			if self.mode == "viewcommit":
+				objScript = generateCommitScript(None, databaseText, dbObjTypeText, itemText, self.dataid)
 
+			if self.mode == "viewshelve":
+				objScript = generateShelveScript(None, databaseText, dbObjTypeText, itemText, self.dataid)
+
+			#self.lstEdited.document().setPlainText(objScript);
+			self.populateEditInfo(objScript)
 			self.versionList.clear() #clear items first
-			self.lstEdited.document().setPlainText(objScript);
+
+	def populateEditInfo(self, objScript):
+		highlight = syntax.PythonHighlighter(self.lstEdited.document())
+		self.lstEdited.setPlainText(objScript);
 
 	def createPatch(self):
 		print("Selecting folder for patch")
@@ -965,6 +1041,8 @@ class Layout(QtWidgets.QWidget):
 				cursor = conn.cursor()
 				files = cursor.execute(query)
 
+				content = ""
+
 				for file in files:
 					subfolder = str(folder) + "/" + str(file[3]) + "/" + str(file[2]) + "/"
 
@@ -976,8 +1054,16 @@ class Layout(QtWidgets.QWidget):
 					log_obj.close()
 
 
-				error_message = "Patch file has been successfully created"
-				QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", error_message,  QtWidgets.QMessageBox.Ok)
+				# result = getCommitDetails(self.txtCommitID.text())
+				# for res in result:
+				# 	content += str(res) + "\n"
+
+				# project  = open(str(folder) + "/" + self.txtCommitID.text() + ".scv", "wb")
+				# project.write(content)
+				# project.close()
+
+				message = "Patch file has been successfully created"
+				QtWidgets.QMessageBox.question(globalvars.MainWindow, "Install Scripts", message,  QtWidgets.QMessageBox.Ok)
 
 				openLogFolder(folder)
 
@@ -1096,7 +1182,9 @@ class Layout(QtWidgets.QWidget):
 				#item.itemDoubleClicked.connect(lambda:generateObjectScript(None, None, None, None, version[6]))
 				self.versionList.addItem(item)
 
-			self.lstEdited.document().setPlainText(objScript);
+			# highlight = syntax.PythonHighlighter(self.lstEdited.document())
+			# self.lstEdited.setPlainText(objScript);
+			self.populateEditInfo(objScript)
 			self.contParentTab.setTabText(0, objName)
 
 

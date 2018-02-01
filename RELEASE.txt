@@ -1,3 +1,10 @@
+Alpha 1.7
+- Added database level in creating patch file
+- fixed merging when using Windows Authentication
+- Added syntax highlighter
+- fix when changing tabs
+
+
 Alpha 1.6
 - added saving workspace using shelf and other functionalities such as applying saved state to current workspace
 - saving password(current username)

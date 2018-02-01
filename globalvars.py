@@ -14,8 +14,11 @@ sett = None
 compareObj = None
 masterPassword = "P@ssw0rd"
 
+tabOffset = 4
 openedCommitTab = []
 openedCommitTabText = []
+openedCommitTabType = []
+
 openedDetailsTab = []
 openedDetailsTabID = []
 
@@ -36,3 +39,12 @@ DBTEST = "master"
 DBGIT = "SQLVC"
 SQLSERVER = "ODBC Driver 13 for SQL Server"
 WORKSPACE_SELECTED = []
+
+
+objectDefinition = {	
+						"PROCEDURE" : "P", 
+						"FUNCTION" : "FN",
+						"TABLE" : "T",
+						"TRIGGER" : "TR",
+						"VIEW" : "V"
+					 }

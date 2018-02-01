@@ -341,7 +341,7 @@ def readConnConfiguration(path, connWin = None):
 	elif connWin.layout.txtPassword.text() == "":
 		connWin.layout.txtPassword.setFocus()
 	else:
-		connWin.layout.btnOpen.setFocus()
+		connWin.layout.txtPassword.setFocus()
 
 def getUserObject():
 
@@ -449,7 +449,6 @@ def generateCommitScript(user, database, objType, objName, commitId = ''):
 
 	if globalvars.engine == "Microsoft SQL Server":
 		query = get_latest_script_by_commit(database, objType, objName, commitId)
-		#print(query)
 		conn = pyodbc.connect(globalvars.connString)
 		cursor = conn.cursor()
 		cursor.execute(query)
@@ -457,6 +456,21 @@ def generateCommitScript(user, database, objType, objName, commitId = ''):
 		for row in rows:
 			viewObj = row[0]
 	return viewObj
+
+def generateShelveScript(user, database, objType, objName, shelveID = ''):
+	viewObj = ""
+
+	if globalvars.engine == "Microsoft SQL Server":
+		query = get_shelfitem_by_rowid(database, objType, objName, shelveID)
+		conn = pyodbc.connect(globalvars.connString)
+		cursor = conn.cursor()
+		cursor.execute(query)
+		rows = cursor.fetchall()
+		for row in rows:
+			viewObj = row[0]
+	return viewObj
+
+
 
 def generateRemoteScript(server, auth, serverUser, serverPass, database, objType, objName):
 	
@@ -471,7 +485,8 @@ def generateRemoteScript(server, auth, serverUser, serverPass, database, objType
 				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + server + ";DATABASE=" + database + ";UID=" + serverUser + ";PWD=" + serverPass
 
 			#query = get_latest_script_by_user('', database, objType, objName)
-			otype = objType[0:1]
+			#otype = objType[0:1]
+			otype = getObjectType(objType.upper())
 			oname = objName.split(".")[1]
 
 			query = get_latest_script(otype, oname)
@@ -496,6 +511,15 @@ def generateRemoteScript(server, auth, serverUser, serverPass, database, objType
 			reply = QtWidgets.QMessageBox.question(globalvars.MainWindow, "Error Applying Merge", error_message,  QtWidgets.QMessageBox.Ok)
 
 			return "ERROR GENERATING SCRIPT, SEE LOG FILE!!!"
+
+def getObjectType(objectTypeName):
+	objects = globalvars.objectDefinition
+
+	try:
+		return objects[objectTypeName]
+	except Exception as e:
+		saveLog(traceback.format_exc())
+		return objectTypeName[0:1]
 
 
 def generateVersionList(database, objType, objName):
@@ -1252,11 +1276,17 @@ def openLogFolder(path):
 	else:
 		subprocess.Popen(["xdg-open", path])
 
-def getDatabaseList():
+def getDatabaseList(serverType, server, authType, username, password):
 	try:
 		if globalvars.engine == "Microsoft SQL Server":
+
+			if authType == "Windows Authentication":
+				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + server + ";DATABASE=master;Trusted_Connection=yes;"
+			else:
+				connString = "DRIVER={" + globalvars.SQLSERVER + "};SERVER=" + server + ";DATABASE=master;UID=" + username + ";PWD=" + password
+
 			query = getDatabases()
-			conn = pyodbc.connect(globalvars.connString, autocommit=True)
+			conn = pyodbc.connect(connString, autocommit=True)
 			cursor = conn.cursor()
 			data = cursor.execute(query)
 			return data

@@ -49,6 +49,9 @@ def get_shelfitem_by_rowid(database, objectType, objectName, shelveid):
 def get_scripts_by_commit(commitid):
 	return """SELECT ObjectName, ObjectDDL, ObjectType, DatabaseName from [SQLVC].[dbo].[Commits_dtl] where CommitID='""" + str(commitid) + """'"""
 
+def get_scripts_by_commit(commitid):
+	return """SELECT ObjectName, ObjectDDL, ObjectType, DatabaseName from [SQLVC].[dbo].[Commits_dtl] where CommitID='""" + str(commitid) + """'"""
+
 def get_scripts_apply_shelve(shelveid, database, objectType, objectName):
 	return """insert into dbo.UserWorkspace(DatabaseName, SchemaName, ObjectName, LoginName, ObjectType)
 			select DatabaseName, SchemaName, ObjectName, LoginName, ObjectType from Shelve_dtl where ShelveID='"""+shelveid+"""' and DatabaseName='"""+database+"""' and ObjectType='"""+objectType+"""' and (SchemaName + '.' + ObjectName)='"""+objectName+"""'"""
